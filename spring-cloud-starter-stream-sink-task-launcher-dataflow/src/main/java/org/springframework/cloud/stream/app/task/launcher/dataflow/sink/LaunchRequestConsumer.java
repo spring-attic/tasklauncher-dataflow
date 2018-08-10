@@ -61,7 +61,7 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 
 			if (serverIsAcceptingNewTasks()) {
 				if (paused.compareAndSet(true, false)) {
-					log.debug("Polling resumed");
+					log.info("Polling resumed");
 				}
 				input.poll(message -> {
 					LaunchRequest request = (LaunchRequest) message.getPayload();
@@ -71,7 +71,7 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 			}
 			else {
 				if (paused.compareAndSet(false, true)) {
-					log.debug("Polling paused");
+					log.info("Polling paused");
 				}
 			}
 		}, trigger);
