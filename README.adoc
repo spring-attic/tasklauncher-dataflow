@@ -1,0 +1,5 @@
+# Task Launcher Data Flow Sink
+
+To learn more about this application and the supported properties, please review the following link.
+
+include::spring-cloud-starter-stream-sink-task-launcher-dataflow/README.adoc[]
