@@ -113,7 +113,7 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 
 	@Override
 	public int getPhase() {
-		return 0;
+		return Integer.MAX_VALUE;
 	}
 
 	private boolean serverIsAcceptingNewTasks() {
