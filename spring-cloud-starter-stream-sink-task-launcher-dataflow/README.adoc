@@ -64,8 +64,9 @@ http://docs.spring.io/spring-cloud-dataflow/docs/current/reference/htmlsingle/#s
 
 When the number of running tasks drops below this limit, the sink will resume processing. This is intended to prevent
 the SCDF deployment platform from running out of resources under heavy task demand. The polling sink is also
-scheduled with a `PeriodicTrigger`. By default the maximum launch request rate is 1 per second, but may be
-configured to any duration, down to zero.
+scheduled with a `DynamicPeriodicTrigger`. By default the maximum launch request rate is 1 per second, but may be
+configured to any duration. When paused, the trigger period will increase, applying exponential backoff, up to 8
+times the configured delay.
 
 
 NOTE: Pausing the polling puts pressure

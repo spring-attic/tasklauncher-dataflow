@@ -21,6 +21,7 @@ import org.springframework.cloud.dataflow.rest.client.DataFlowOperations;
 import org.springframework.cloud.stream.annotation.EnableBinding;
 import org.springframework.cloud.stream.binder.PollableMessageSource;
 import org.springframework.context.annotation.Bean;
+import org.springframework.integration.util.DynamicPeriodicTrigger;
 import org.springframework.scheduling.Trigger;
 import org.springframework.scheduling.support.PeriodicTrigger;
 
@@ -34,8 +35,8 @@ import org.springframework.scheduling.support.PeriodicTrigger;
 public class TaskLauncherDataflowSinkConfiguration {
 
 	@Bean
-	public Trigger periodicTrigger(TriggerProperties triggerProperties) {
-		PeriodicTrigger trigger = new PeriodicTrigger(triggerProperties.getFixedDelay(),
+	public DynamicPeriodicTrigger periodicTrigger(TriggerProperties triggerProperties) {
+		DynamicPeriodicTrigger trigger = new DynamicPeriodicTrigger(triggerProperties.getFixedDelay(),
 			triggerProperties.getTimeUnit());
 		trigger.setInitialDelay(triggerProperties.getInitialDelay());
 		return trigger;
@@ -43,7 +44,7 @@ public class TaskLauncherDataflowSinkConfiguration {
 
 	@Bean
 	public LaunchRequestConsumer launchRequestConsumer(PollableMessageSource input,
-		DataFlowOperations dataFlowOperations, Trigger trigger) {
+		DataFlowOperations dataFlowOperations, DynamicPeriodicTrigger trigger) {
 
 		if (dataFlowOperations.taskOperations() == null) {
 			throw new IllegalArgumentException("The SCDF server does not support task operations");

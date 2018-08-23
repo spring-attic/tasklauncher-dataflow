@@ -16,6 +16,7 @@
 
 package org.springframework.cloud.stream.app.task.launcher.dataflow.sink;
 
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.logging.Log;
@@ -26,7 +27,7 @@ import org.springframework.cloud.dataflow.rest.resource.CurrentTaskExecutionsRes
 import org.springframework.cloud.stream.binder.PollableMessageSource;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.scheduling.Trigger;
+import org.springframework.integration.util.DynamicPeriodicTrigger;
 import org.springframework.scheduling.concurrent.ConcurrentTaskScheduler;
 import org.springframework.util.Assert;
 
@@ -35,26 +36,34 @@ import org.springframework.util.Assert;
  **/
 public class LaunchRequestConsumer implements SmartLifecycle {
 	private static final Log log = LogFactory.getLog(LaunchRequestConsumer.class);
+	private static final int BACKOFF_MULTIPLE = 2;
+	private static final int BACKOFF_MAX_MULTIPLE = 8;
+
 	private final PollableMessageSource input;
 	private final AtomicBoolean running = new AtomicBoolean();
 	private final AtomicBoolean paused = new AtomicBoolean();
 	private final TaskOperations taskOperations;
-	private final Trigger trigger;
+	private final DynamicPeriodicTrigger trigger;
 	private final ConcurrentTaskScheduler taskScheduler;
+	private final long initialPeriod;
 
-	public LaunchRequestConsumer(PollableMessageSource input, Trigger trigger, TaskOperations taskOperations) {
+	private ScheduledFuture<?> scheduledFuture;
+
+	public LaunchRequestConsumer(PollableMessageSource input, DynamicPeriodicTrigger trigger,
+		TaskOperations taskOperations) {
 		Assert.notNull(input, "`input` cannot be null.");
 		Assert.notNull(taskOperations, "`taskOperations` cannot be null.");
 		this.input = input;
 		this.trigger = trigger;
+		this.initialPeriod = trigger.getPeriod();
 		this.taskOperations = taskOperations;
 		this.taskScheduler = new ConcurrentTaskScheduler();
 
 	}
 
-	public void consume() {
+	ScheduledFuture<?> consume() {
 
-		taskScheduler.schedule(() -> {
+		return taskScheduler.schedule(() -> {
 			if (!isRunning()) {
 				return;
 			}
@@ -62,7 +71,12 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 			if (serverIsAcceptingNewTasks()) {
 				if (paused.compareAndSet(true, false)) {
 					log.info("Polling resumed");
+					trigger.setPeriod(initialPeriod);
+					if (initialPeriod > 0) {
+						log.info(String.format("Polling period reset to %d ms.", trigger.getPeriod()));
+					}
 				}
+
 				input.poll(message -> {
 					LaunchRequest request = (LaunchRequest) message.getPayload();
 					launchTask(request);
@@ -72,6 +86,10 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 			else {
 				if (paused.compareAndSet(false, true)) {
 					log.info("Polling paused");
+				}
+				if (trigger.getPeriod() > 0 && trigger.getPeriod() < initialPeriod * BACKOFF_MAX_MULTIPLE) {
+					trigger.setPeriod(trigger.getPeriod() * BACKOFF_MULTIPLE);
+					log.info(String.format("Polling period increased to %d ms.", trigger.getPeriod()));
 				}
 			}
 		}, trigger);
@@ -93,13 +111,15 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 	@Override
 	public void start() {
 		if (running.compareAndSet(false, true)) {
-			consume();
+			this.scheduledFuture = consume();
 		}
 	}
 
 	@Override
 	public void stop() {
-		running.set(false);
+		if (running.getAndSet(false)) {
+			this.scheduledFuture.cancel(false);
+		}
 	}
 
 	@Override
@@ -118,7 +138,9 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 
 	private boolean serverIsAcceptingNewTasks() {
 		CurrentTaskExecutionsResource taskExecutionsResource = taskOperations.currentTaskExecutions();
-		return taskExecutionsResource.getRunningExecutionCount() < taskExecutionsResource.getMaximumTaskExecutions();
+		boolean availableForNewTasks =
+			taskExecutionsResource.getRunningExecutionCount() < taskExecutionsResource.getMaximumTaskExecutions();
+		return availableForNewTasks;
 	}
 
 	long launchTask(LaunchRequest request) {

@@ -41,9 +41,11 @@ import org.springframework.cloud.stream.binder.DefaultPollableMessageSource;
 import org.springframework.cloud.stream.binder.PollableMessageSource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.integration.util.DynamicPeriodicTrigger;
 import org.springframework.lang.Nullable;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.support.MessageBuilder;
+import org.springframework.scheduling.support.PeriodicTrigger;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit4.SpringRunner;
 
@@ -59,7 +61,8 @@ import static org.mockito.Mockito.when;
  **/
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE, classes = LaunchRequestConsumerTests.TestConfig.class, properties = {
-	"logging.level.org.springframework.cloud.stream.app.task.launcher.dataflow.sink=DEBUG", "trigger.fixed-delay=0", "trigger.initial-delay=0" })
+	"logging.level.org.springframework.cloud.stream.app.task.launcher.dataflow.sink=DEBUG", "trigger.fixed-delay=10",
+	"trigger.time-unit=MILLISECONDS", "trigger.initial-delay=0" })
 public class LaunchRequestConsumerTests {
 	private static Log log = LogFactory.getLog(LaunchRequestConsumerTests.class);
 
@@ -75,6 +78,9 @@ public class LaunchRequestConsumerTests {
 	@Autowired
 	private LaunchRequestConsumer consumer;
 
+	@Autowired
+	private DynamicPeriodicTrigger trigger;
+
 	@Test
 	@DirtiesContext
 	public void consumerPausesWhenMaxTaskExecutionsReached() throws InterruptedException {
@@ -85,12 +91,13 @@ public class LaunchRequestConsumerTests {
 			currentTaskExecutionsResource.getMaximumTaskExecutions());
 
 		assertThat(consumer.isPaused() && consumer.isRunning()).isTrue();
-
+		assertThat(trigger.getPeriod()).isGreaterThanOrEqualTo(20);
+		phaser.awaitAdvance(0);
 		log.debug("Resetting execution count");
 		currentTaskExecutionsResource.setRunningExecutionCount(0);
-		phaser.awaitAdvance(0);
-		assertThat(phaser.getPhase()).isEqualTo(1);
+		phaser.awaitAdvance(1);
 		assertThat(consumer.isPaused()).isFalse();
+
 	}
 
 	@SpringBootApplication
@@ -128,6 +135,7 @@ public class LaunchRequestConsumerTests {
 
 			taskOperations = mock(TaskOperations.class);
 			when(taskOperations.launch(anyString(), anyMap(), anyList())).thenAnswer((Answer<Long>) invocation -> {
+
 				if (currentTaskExecutionsResource.getRunningExecutionCount() == 0) {
 					phaser.arrive();
 				}
