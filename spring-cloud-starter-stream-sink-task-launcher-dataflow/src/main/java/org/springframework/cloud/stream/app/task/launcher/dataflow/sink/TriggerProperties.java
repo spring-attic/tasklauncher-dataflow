@@ -32,17 +32,17 @@ public class TriggerProperties {
 	/**
 	 * The initial delay.
 	 */
-	private int initialDelay=1;
+	private int initialDelay=1000;
 
 	/**
 	 * The fixed delay (polling interval).
 	 */
-	private int fixedDelay=1;
+	private int fixedDelay=1000;
 
 	/**
 	 * The TimeUnit to apply to delay values.
 	 */
-	private TimeUnit timeUnit = TimeUnit.SECONDS;
+	private TimeUnit timeUnit = TimeUnit.MILLISECONDS;
 
 	@Min(0)
 	public int getInitialDelay() {

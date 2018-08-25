@@ -18,8 +18,8 @@ package org.springframework.cloud.stream.app.task.launcher.dataflow.sink;
 
 import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -34,19 +34,22 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.cloud.dataflow.rest.client.DataFlowOperations;
 import org.springframework.cloud.dataflow.rest.client.TaskOperations;
 import org.springframework.cloud.dataflow.rest.resource.CurrentTaskExecutionsResource;
 import org.springframework.cloud.stream.binder.DefaultPollableMessageSource;
 import org.springframework.cloud.stream.binder.PollableMessageSource;
+import org.springframework.cloud.stream.binding.BindingService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.env.Environment;
 import org.springframework.integration.util.DynamicPeriodicTrigger;
 import org.springframework.lang.Nullable;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.support.MessageBuilder;
-import org.springframework.scheduling.support.PeriodicTrigger;
 import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit4.SpringRunner;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -61,42 +64,124 @@ import static org.mockito.Mockito.when;
  **/
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE, classes = LaunchRequestConsumerTests.TestConfig.class, properties = {
-	"logging.level.org.springframework.cloud.stream.app.task.launcher.dataflow.sink=DEBUG", "trigger.fixed-delay=10",
-	"trigger.time-unit=MILLISECONDS", "trigger.initial-delay=0" })
-public class LaunchRequestConsumerTests {
-	private static Log log = LogFactory.getLog(LaunchRequestConsumerTests.class);
+	"logging.level.org.springframework.cloud.stream.app.task.launcher.dataflow.sink=DEBUG", "maxExecutions=10" })
+@DirtiesContext
+public abstract class LaunchRequestConsumerTests {
+	protected static Log log = LogFactory.getLog(LaunchRequestConsumerTests.class);
 
-	@Autowired
-	private CurrentTaskExecutionsResource currentTaskExecutionsResource;
+	//TODO: Test Binder not working with PollableMessageSource
+	@MockBean
+	BindingService bindingService;
 
-	@Autowired
-	private CountDownLatch countDownLatch;
+	@TestPropertySource(properties = { "trigger.fixed-delay=10", "trigger.time-unit=MILLISECONDS",
+		"trigger.initial-delay=0", "autostart=false" })
+	public static class PauseAndResumeTests extends LaunchRequestConsumerTests {
+		private static long MAX_WAIT = 1000;
 
-	@Autowired
-	private Phaser phaser;
+		@Autowired
+		private CurrentTaskExecutionsResource currentTaskExecutionsResource;
 
-	@Autowired
-	private LaunchRequestConsumer consumer;
+		@Autowired
+		private CountDownLatch countDownLatch;
 
-	@Autowired
-	private DynamicPeriodicTrigger trigger;
+		@Autowired
+		private LaunchRequestConsumer consumer;
 
-	@Test
-	@DirtiesContext
-	public void consumerPausesWhenMaxTaskExecutionsReached() throws InterruptedException {
+		@Autowired
+		private DynamicPeriodicTrigger trigger;
 
-		assertThat(countDownLatch.await(1, TimeUnit.SECONDS)).isTrue();
+		@Test
+		@DirtiesContext
+		public void consumerPausesWhenMaxTaskExecutionsReached() throws InterruptedException {
 
-		assertThat(currentTaskExecutionsResource.getRunningExecutionCount()).isEqualTo(
-			currentTaskExecutionsResource.getMaximumTaskExecutions());
+			currentTaskExecutionsResource.setRunningExecutionCount(0);
+			currentTaskExecutionsResource.setMaximumTaskExecutions(10);
 
-		assertThat(consumer.isPaused() && consumer.isRunning()).isTrue();
-		assertThat(trigger.getPeriod()).isGreaterThanOrEqualTo(20);
-		phaser.awaitAdvance(0);
-		log.debug("Resetting execution count");
-		currentTaskExecutionsResource.setRunningExecutionCount(0);
-		phaser.awaitAdvance(1);
-		assertThat(consumer.isPaused()).isFalse();
+			consumer.start();
+
+			assertThat(countDownLatch.await(1, TimeUnit.SECONDS)).isTrue();
+
+			assertThat(currentTaskExecutionsResource.getRunningExecutionCount()).isEqualTo(
+				currentTaskExecutionsResource.getMaximumTaskExecutions());
+
+			assertThat(eventually(c -> c.isPaused() && c.isRunning())).isTrue();
+
+			assertThat(trigger.getPeriod()).isGreaterThanOrEqualTo(20);
+
+			log.debug("Resetting execution count");
+			currentTaskExecutionsResource.setRunningExecutionCount(0);
+
+			assertThat(eventually(c -> !c.isPaused())).isTrue();
+		}
+
+		private synchronized boolean eventually(Predicate<LaunchRequestConsumer> condition) {
+			long waitTime = 0;
+			long sleepTime = 10;
+			while (waitTime < MAX_WAIT) {
+				if (condition.test(consumer)) {
+					return true;
+				}
+				waitTime += sleepTime;
+				try {
+					Thread.sleep(sleepTime);
+				}
+				catch (InterruptedException e) {
+					Thread.interrupted();
+				}
+			}
+			return condition.test(consumer);
+		}
+	}
+
+	@TestPropertySource(properties = { "trigger.fixed-delay=10", "trigger.time-unit=MILLISECONDS",
+		"trigger.initial-delay=0" })
+	public static class DynamicPeriodicTriggerTests extends LaunchRequestConsumerTests {
+
+		@Autowired
+		private DynamicPeriodicTrigger trigger;
+
+		@Autowired
+		private CurrentTaskExecutionsResource currentTaskExecutionsResource;
+
+		@Autowired
+		private LaunchRequestConsumer consumer;
+
+		@Test
+		@DirtiesContext
+		public void testExponentialBackOff() throws InterruptedException {
+
+			currentTaskExecutionsResource.setRunningExecutionCount(
+				currentTaskExecutionsResource.getMaximumTaskExecutions());
+
+			long waitTime = 0;
+			while (trigger.getPeriod() < 80) {
+				Thread.sleep(10);
+				waitTime += 10;
+				assertThat(waitTime).isLessThan(1000);
+			}
+			assertThat(consumer.isPaused() && consumer.isRunning()).isTrue();
+		}
+	}
+
+	@TestPropertySource(properties = { "trigger.fixed-delay=10", "trigger.time-unit=MILLISECONDS",
+		"trigger.initial-delay=0", "messageSourceDisabled=true", "countDown=3" })
+	public static class BackoffWhenNoMessages extends LaunchRequestConsumerTests {
+		@Autowired
+		private CountDownLatch countDownLatch;
+
+		@Autowired
+		private CurrentTaskExecutionsResource currentTaskExecutionsResource;
+
+		@Autowired
+		private DynamicPeriodicTrigger trigger;
+
+		@Test
+		public void backoffWhenNoMessages() throws InterruptedException {
+			//CountDown for null messages when messageSourceDisabled.
+			assertThat(countDownLatch.await(1, TimeUnit.SECONDS)).isTrue();
+			assertThat(currentTaskExecutionsResource.getRunningExecutionCount()).isZero();
+			assertThat(trigger.getPeriod()).isGreaterThanOrEqualTo(40);
+		}
 
 	}
 
@@ -114,40 +199,29 @@ public class LaunchRequestConsumerTests {
 		private CurrentTaskExecutionsResource currentTaskExecutionsResource = new CurrentTaskExecutionsResource();
 
 		@Bean
-		public CurrentTaskExecutionsResource currentTaskExecutionsResource() {
-			currentTaskExecutionsResource.setMaximumTaskExecutions(10);
+		public CurrentTaskExecutionsResource currentTaskExecutionsResource(Environment environment) {
+			currentTaskExecutionsResource.setMaximumTaskExecutions(
+				Integer.valueOf(environment.getProperty("maxExecutions", "10")));
 			return currentTaskExecutionsResource;
 		}
 
 		@Bean
-		public CountDownLatch countDownLatch(CurrentTaskExecutionsResource resource) {
-			return new CountDownLatch((int) resource.getMaximumTaskExecutions());
-		}
+		public CountDownLatch countDownLatch(CurrentTaskExecutionsResource resource, Environment environment) {
+			return new CountDownLatch(environment.containsProperty("countDown") ?
+				Integer.valueOf(environment.getProperty("countDown")) :
+				(int) resource.getMaximumTaskExecutions());
 
-		@Bean
-		public Phaser phaser() {
-			return new Phaser(2);
 		}
 
 		@Bean
 		DataFlowOperations dataFlowOperations(CurrentTaskExecutionsResource currentTaskExecutionsResource,
-			CountDownLatch latch, Phaser phaser) {
+			CountDownLatch latch) {
 
 			taskOperations = mock(TaskOperations.class);
 			when(taskOperations.launch(anyString(), anyMap(), anyList())).thenAnswer((Answer<Long>) invocation -> {
 
-				if (currentTaskExecutionsResource.getRunningExecutionCount() == 0) {
-					phaser.arrive();
-				}
-
 				currentTaskExecutionsResource.setRunningExecutionCount(
 					currentTaskExecutionsResource.getRunningExecutionCount() + 1);
-				log.debug("running execution count " + currentTaskExecutionsResource.getRunningExecutionCount());
-
-				if (currentTaskExecutionsResource.getRunningExecutionCount()
-					>= currentTaskExecutionsResource.getMaximumTaskExecutions()) {
-					phaser.arrive();
-				}
 				latch.countDown();
 
 				return currentTaskExecutionsResource.getRunningExecutionCount();
@@ -155,18 +229,21 @@ public class LaunchRequestConsumerTests {
 			});
 
 			when(taskOperations.currentTaskExecutions()).thenReturn(currentTaskExecutionsResource);
+
 			dataFlowOperations = mock(DataFlowOperations.class);
 			when(dataFlowOperations.taskOperations()).thenReturn(taskOperations);
 			return dataFlowOperations;
 		}
 
 		@Bean
-		public BeanPostProcessor beanPostProcessor() {
+		public BeanPostProcessor beanPostProcessor(Environment environment, CountDownLatch countDownLatch) {
 			return new BeanPostProcessor() {
 				@Nullable
 				@Override
 				public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
 
+					boolean messageSourceDisabled = Boolean.valueOf(
+						environment.getProperty("messageSourceDisabled", "false"));
 					if (bean instanceof PollableMessageSource) {
 						DefaultPollableMessageSource messageSource = (DefaultPollableMessageSource) bean;
 						messageSource.setSource(() -> {
@@ -176,16 +253,21 @@ public class LaunchRequestConsumerTests {
 
 							Message<Object> message = null;
 
-							try {
-								message = MessageBuilder.withPayload((Object) objectMapper.writeValueAsBytes(request))
-									.setHeader("contentType", "application/json")
-									.build();
+							if (messageSourceDisabled) {
+								countDownLatch.countDown();
 							}
-							catch (JsonProcessingException e) {
-								e.printStackTrace();
+							else {
+								try {
+									message = MessageBuilder.withPayload(
+										(Object) objectMapper.writeValueAsBytes(request))
+										.setHeader("contentType", "application/json")
+										.build();
+								}
+								catch (JsonProcessingException e) {
+									e.printStackTrace();
+								}
 							}
 							return message;
-
 						});
 					}
 

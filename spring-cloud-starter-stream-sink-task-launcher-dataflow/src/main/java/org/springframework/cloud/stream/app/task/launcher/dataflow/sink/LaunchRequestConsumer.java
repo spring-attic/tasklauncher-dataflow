@@ -16,6 +16,7 @@
 
 package org.springframework.cloud.stream.app.task.launcher.dataflow.sink;
 
+import java.time.Duration;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -37,7 +38,7 @@ import org.springframework.util.Assert;
 public class LaunchRequestConsumer implements SmartLifecycle {
 	private static final Log log = LogFactory.getLog(LaunchRequestConsumer.class);
 	private static final int BACKOFF_MULTIPLE = 2;
-	private static final int BACKOFF_MAX_MULTIPLE = 8;
+	private static final int BACKOFF_MAX_SECONDS = 30;
 
 	private final PollableMessageSource input;
 	private final AtomicBoolean running = new AtomicBoolean();
@@ -46,6 +47,7 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 	private final DynamicPeriodicTrigger trigger;
 	private final ConcurrentTaskScheduler taskScheduler;
 	private final long initialPeriod;
+	private volatile boolean autoStart = true;
 
 	private ScheduledFuture<?> scheduledFuture;
 
@@ -71,33 +73,39 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 			if (serverIsAcceptingNewTasks()) {
 				if (paused.compareAndSet(true, false)) {
 					log.info("Polling resumed");
-					trigger.setPeriod(initialPeriod);
-					if (initialPeriod > 0) {
+				}
+
+				if (!input.poll(message -> {
+					LaunchRequest request = (LaunchRequest) message.getPayload();
+					log.debug("Received a Task launch request - task name:  " + request.getApplicationName());
+					launchTask(request);
+				}, new ParameterizedTypeReference<LaunchRequest>() {
+				})) {
+					backoff("No task launch request received");
+				}
+				else {
+
+					if (trigger.getPeriod() > initialPeriod) {
+						trigger.setPeriod(initialPeriod);
 						log.info(String.format("Polling period reset to %d ms.", trigger.getPeriod()));
 					}
 				}
-
-				input.poll(message -> {
-					LaunchRequest request = (LaunchRequest) message.getPayload();
-					launchTask(request);
-				}, new ParameterizedTypeReference<LaunchRequest>() {
-				});
 			}
 			else {
-				if (paused.compareAndSet(false, true)) {
-					log.info("Polling paused");
-				}
-				if (trigger.getPeriod() > 0 && trigger.getPeriod() < initialPeriod * BACKOFF_MAX_MULTIPLE) {
-					trigger.setPeriod(trigger.getPeriod() * BACKOFF_MULTIPLE);
-					log.info(String.format("Polling period increased to %d ms.", trigger.getPeriod()));
-				}
+				paused.set(true);
+				backoff("Polling paused while task executions complete");
+
 			}
 		}, trigger);
 	}
 
 	@Override
 	public boolean isAutoStartup() {
-		return true;
+		return autoStart;
+	}
+
+	public void setAutoStartup(boolean autoStart) {
+		this.autoStart = autoStart;
 	}
 
 	@Override
@@ -136,16 +144,45 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 		return Integer.MAX_VALUE;
 	}
 
+	private void backoff(String message) {
+		if (trigger.getPeriod() > 0 && trigger.getPeriod() < Duration.ofSeconds(BACKOFF_MAX_SECONDS).toMillis()) {
+
+			Duration duration = Duration.ofMillis(trigger.getPeriod());
+			if (duration.compareTo(Duration.ofSeconds(8)) <= 0) {
+				//If d >= 1, round to 1 seconds.
+				if (duration.getSeconds() == 1) {
+					duration = duration.ofSeconds(1);
+				}
+				duration = duration.multipliedBy(BACKOFF_MULTIPLE);
+			}
+			else {
+				duration = Duration.ofSeconds(BACKOFF_MAX_SECONDS);
+			}
+			if (trigger.getPeriod() < 1000) {
+				log.info(String.format(message + " - increasing polling period to %d ms.", duration.toMillis()));
+			}
+			else {
+				log.info(String.format(message + "- increasing polling period to %d seconds.", duration.getSeconds()));
+			}
+			trigger.setPeriod(duration.toMillis());
+		}
+	}
+
 	private boolean serverIsAcceptingNewTasks() {
 		CurrentTaskExecutionsResource taskExecutionsResource = taskOperations.currentTaskExecutions();
 		boolean availableForNewTasks =
 			taskExecutionsResource.getRunningExecutionCount() < taskExecutionsResource.getMaximumTaskExecutions();
+		if (!availableForNewTasks) {
+			log.warn(String.format("Data Flow server has reached its concurrent task execution limit: (%d)",
+				taskExecutionsResource.getMaximumTaskExecutions()));
+		}
 		return availableForNewTasks;
 	}
 
-	long launchTask(LaunchRequest request) {
+	private long launchTask(LaunchRequest request) {
 		log.info(String.format("Launching Task %s", request.getApplicationName()));
 		return taskOperations.launch(request.getApplicationName(), request.getDeploymentProperties(),
 			request.getCommandlineArguments());
 	}
+
 }

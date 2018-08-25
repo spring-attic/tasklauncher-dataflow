@@ -16,6 +16,7 @@
 
 package org.springframework.cloud.stream.app.task.launcher.dataflow.sink;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.dataflow.rest.client.DataFlowOperations;
 import org.springframework.cloud.stream.annotation.EnableBinding;
@@ -34,6 +35,9 @@ import org.springframework.scheduling.support.PeriodicTrigger;
 @EnableConfigurationProperties({ TriggerProperties.class})
 public class TaskLauncherDataflowSinkConfiguration {
 
+	@Value("${autostart:true}")
+	private boolean autoStart;
+
 	@Bean
 	public DynamicPeriodicTrigger periodicTrigger(TriggerProperties triggerProperties) {
 		DynamicPeriodicTrigger trigger = new DynamicPeriodicTrigger(triggerProperties.getFixedDelay(),
@@ -49,6 +53,9 @@ public class TaskLauncherDataflowSinkConfiguration {
 		if (dataFlowOperations.taskOperations() == null) {
 			throw new IllegalArgumentException("The SCDF server does not support task operations");
 		}
-		return new LaunchRequestConsumer(input, trigger, dataFlowOperations.taskOperations());
+		LaunchRequestConsumer consumer =
+			new LaunchRequestConsumer(input, trigger, dataFlowOperations.taskOperations());
+		consumer.setAutoStartup(autoStart);
+		return consumer;
 	}
 }
