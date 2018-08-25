@@ -16,6 +16,8 @@
 
 package org.springframework.cloud.stream.app.task.launcher.dataflow.sink;
 
+import javax.annotation.PostConstruct;
+import javax.persistence.criteria.CriteriaBuilder;
 import javax.validation.constraints.Min;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -38,7 +40,7 @@ public class TriggerProperties {
 	private int period = 1000;
 
 	/**
-	 * The maximum polling period in milliseconds.
+	 * The maximum polling period in milliseconds. Will be set to period if period > maxPeriod.
 	 */
 	private int maxPeriod = 30000;
 
@@ -68,4 +70,10 @@ public class TriggerProperties {
 	public void setMaxPeriod(int maxPeriod) {
 		this.maxPeriod = maxPeriod;
 	}
+
+	@PostConstruct
+	public void checkMaxPeriod() {
+		maxPeriod = Integer.max(maxPeriod, period);
+	}
+
 }
