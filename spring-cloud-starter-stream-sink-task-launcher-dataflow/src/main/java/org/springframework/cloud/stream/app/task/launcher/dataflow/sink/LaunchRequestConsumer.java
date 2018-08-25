@@ -78,6 +78,9 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 
 	}
 
+	/*
+	 * Polling loop
+	 */
 	ScheduledFuture<?> consume() {
 
 		return taskScheduler.schedule(() -> {
@@ -108,7 +111,7 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 			}
 			else {
 				paused.set(true);
-				backoff("Polling paused while task executions complete");
+				backoff("Polling paused");
 
 			}
 		}, trigger);
@@ -163,7 +166,10 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 		if (trigger.getPeriod() > 0 && trigger.getPeriod() < Duration.ofMillis(maxPeriod).toMillis()) {
 
 			Duration duration = Duration.ofMillis(trigger.getPeriod());
-			if (duration.compareTo(Duration.ofSeconds(8)) <= 0) {
+
+
+
+			if (duration.multipliedBy(BACKOFF_MULTIPLE).compareTo(Duration.ofMillis(maxPeriod)) <= 0) {
 				//If d >= 1, round to 1 seconds.
 				if (duration.getSeconds() == 1) {
 					duration = duration.ofSeconds(1);
@@ -179,21 +185,37 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 			else {
 				log.info(String.format(message + "- increasing polling period to %d seconds.", duration.getSeconds()));
 			}
+
 			trigger.setPeriod(duration.toMillis());
+		}
+		else if (trigger.getPeriod() == Duration.ofMillis(maxPeriod).toMillis()){
+			log.info(message);
 		}
 	}
 
 	private boolean serverIsAcceptingNewTasks() {
-		CurrentTaskExecutionsResource taskExecutionsResource = taskOperations.currentTaskExecutions();
-		boolean availableForNewTasks =
-			taskExecutionsResource.getRunningExecutionCount() < taskExecutionsResource.getMaximumTaskExecutions();
-		if (!availableForNewTasks) {
-			log.warn(String.format("Data Flow server has reached its concurrent task execution limit: (%d)",
-				taskExecutionsResource.getMaximumTaskExecutions()));
+
+		boolean availableForNewTasks = false;
+
+		try {
+			CurrentTaskExecutionsResource taskExecutionsResource = taskOperations.currentTaskExecutions();
+
+			availableForNewTasks = taskExecutionsResource.getRunningExecutionCount() < taskExecutionsResource.getMaximumTaskExecutions();
+			if (!availableForNewTasks) {
+				log.warn(String.format("Data Flow server has reached its concurrent task execution limit: (%d)",
+					taskExecutionsResource.getMaximumTaskExecutions()));
+			}
 		}
-		return availableForNewTasks;
+		// If cannot connect to Data Flow server, log the exception and return false so the poller will back off.
+		catch( Exception e) {
+			log.error(e.getMessage(), e);
+		}
+		finally {
+			return availableForNewTasks;
+		}
 	}
 
+	// Here we need to throw any exception to retry the message.
 	private long launchTask(LaunchRequest request) {
 		log.info(String.format("Launching Task %s", request.getApplicationName()));
 		return taskOperations.launch(request.getApplicationName(), request.getDeploymentProperties(),

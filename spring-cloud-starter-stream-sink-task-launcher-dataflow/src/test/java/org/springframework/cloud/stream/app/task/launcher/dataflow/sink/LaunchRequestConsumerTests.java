@@ -163,7 +163,7 @@ public abstract class LaunchRequestConsumerTests {
 
 	@TestPropertySource(properties = { "trigger.period=10",
 		"trigger.initial-delay=0", "messageSourceDisabled=true", "countDown=3" })
-	public static class BackoffWhenNoMessages extends LaunchRequestConsumerTests {
+	public static class BackoffWhenNoMessagesTest extends LaunchRequestConsumerTests {
 		@Autowired
 		private CountDownLatch countDownLatch;
 
