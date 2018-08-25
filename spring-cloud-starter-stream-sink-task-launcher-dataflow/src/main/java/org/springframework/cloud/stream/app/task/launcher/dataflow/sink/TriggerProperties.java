@@ -16,8 +16,6 @@
 
 package org.springframework.cloud.stream.app.task.launcher.dataflow.sink;
 
-import java.util.concurrent.TimeUnit;
-
 import javax.validation.constraints.Min;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -30,19 +28,19 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 public class TriggerProperties {
 	/**
-	 * The initial delay.
+	 * The initial delay in milliseconds.
 	 */
-	private int initialDelay=1000;
+	private int initialDelay = 1000;
 
 	/**
-	 * The fixed delay (polling interval).
+	 * The polling period in milliseconds.
 	 */
-	private int fixedDelay=1000;
+	private int period = 1000;
 
 	/**
-	 * The TimeUnit to apply to delay values.
+	 * The maximum polling period in milliseconds.
 	 */
-	private TimeUnit timeUnit = TimeUnit.MILLISECONDS;
+	private int maxPeriod = 30000;
 
 	@Min(0)
 	public int getInitialDelay() {
@@ -54,19 +52,20 @@ public class TriggerProperties {
 	}
 
 	@Min(0)
-	public int getFixedDelay() {
-		return fixedDelay;
+	public int getPeriod() {
+		return period;
 	}
 
-	public void setFixedDelay(int fixedDelay) {
-		this.fixedDelay = fixedDelay;
+	public void setPeriod(int period) {
+		this.period = period;
 	}
 
-	public TimeUnit getTimeUnit() {
-		return timeUnit;
+	@Min(1000)
+	public int getMaxPeriod() {
+		return maxPeriod;
 	}
 
-	public void setTimeUnit(TimeUnit timeUnit) {
-		this.timeUnit = timeUnit;
+	public void setMaxPeriod(int maxPeriod) {
+		this.maxPeriod = maxPeriod;
 	}
 }

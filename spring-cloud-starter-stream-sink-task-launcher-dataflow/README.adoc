@@ -55,23 +55,23 @@ $$trigger.time-unit$$:: $$The TimeUnit to apply to delay values.$$ *($$TimeUnit$
 //end::configuration-properties[]
 
 == Using the TaskLauncher
-A tasklauncher is a sink that consumes a `LaunchRequest` message, as described above, and launches the task on a
-target Spring Cloud Data Flow server (given by `--dataflow.uri`). The task launcher sink polls its input for launch
-requests but will pause when the SCDF server's task execution limit, `spring.cloud.dataflow.task
+A tasklauncher is a sink that consumes  `LaunchRequest` messages, as described above, and launches a task using the
+configured Spring Cloud Data Flow server (given by `--dataflow.uri`). The task launcher periodically polls its input
+for launch requests but will pause when the SCDF server's concurrent task execution limit given by `spring.cloud
+.dataflow.task
 .maximum-concurrent-tasks`
 is reached (see the
 http://docs.spring.io/spring-cloud-dataflow/docs/current/reference/htmlsingle/#spring-cloud-dataflow-task-limit-concurrent-executions[reference docs] for more details).
 
-When the number of running tasks drops below this limit, the sink will resume processing. This is intended to prevent
-the SCDF deployment platform from running out of resources under heavy task demand. The polling sink is also
-scheduled with a `DynamicPeriodicTrigger`. By default the maximum launch request rate is 1 per second, but may be
-configured to any duration. When paused, the trigger period will increase, applying exponential backoff, up to 8
-times the configured delay.
+When the number of running tasks drops below this limit message polling resumes. This is intended to prevent
+the SCDF deployer's deployment platform from running out of resources under heavy task load. The poller is
+scheduled using a `DynamicPeriodicTrigger`. By default the polling rate is 1 second, but may be
+configured to any duration. When paused, or if there are no launch requests, the trigger period will increase, applying
+exponential backoff, up to a configured maximum (30 seconds by default).
 
 
-NOTE: Pausing the polling puts pressure
- on the message broker so some tuning will be necessary, in extreme cases, to balance resource utilization.
-
+NOTE: When the poller is paused it puts pressure
+ on the message broker so some tuning will be necessary in extreme cases to balance resource utilization.
 
 == Build
 

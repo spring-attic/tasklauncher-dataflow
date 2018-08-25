@@ -73,8 +73,7 @@ public abstract class LaunchRequestConsumerTests {
 	@MockBean
 	BindingService bindingService;
 
-	@TestPropertySource(properties = { "trigger.fixed-delay=10", "trigger.time-unit=MILLISECONDS",
-		"trigger.initial-delay=0", "autostart=false" })
+	@TestPropertySource(properties = { "trigger.period=10", "trigger.initial-delay=0", "autostart=false" })
 	public static class PauseAndResumeTests extends LaunchRequestConsumerTests {
 		private static long MAX_WAIT = 1000;
 
@@ -133,8 +132,7 @@ public abstract class LaunchRequestConsumerTests {
 		}
 	}
 
-	@TestPropertySource(properties = { "trigger.fixed-delay=10", "trigger.time-unit=MILLISECONDS",
-		"trigger.initial-delay=0" })
+	@TestPropertySource(properties = { "trigger.period=10", "trigger.initial-delay=0" })
 	public static class DynamicPeriodicTriggerTests extends LaunchRequestConsumerTests {
 
 		@Autowired
@@ -163,7 +161,7 @@ public abstract class LaunchRequestConsumerTests {
 		}
 	}
 
-	@TestPropertySource(properties = { "trigger.fixed-delay=10", "trigger.time-unit=MILLISECONDS",
+	@TestPropertySource(properties = { "trigger.period=10",
 		"trigger.initial-delay=0", "messageSourceDisabled=true", "countDown=3" })
 	public static class BackoffWhenNoMessages extends LaunchRequestConsumerTests {
 		@Autowired

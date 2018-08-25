@@ -23,8 +23,6 @@ import org.springframework.cloud.stream.annotation.EnableBinding;
 import org.springframework.cloud.stream.binder.PollableMessageSource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.integration.util.DynamicPeriodicTrigger;
-import org.springframework.scheduling.Trigger;
-import org.springframework.scheduling.support.PeriodicTrigger;
 
 /**
  * Configuration class for the TaskLauncher Data Flow Sink.
@@ -32,7 +30,7 @@ import org.springframework.scheduling.support.PeriodicTrigger;
  * @author David Turanski
  */
 @EnableBinding(PollingSink.class)
-@EnableConfigurationProperties({ TriggerProperties.class})
+@EnableConfigurationProperties({ TriggerProperties.class })
 public class TaskLauncherDataflowSinkConfiguration {
 
 	@Value("${autostart:true}")
@@ -40,21 +38,20 @@ public class TaskLauncherDataflowSinkConfiguration {
 
 	@Bean
 	public DynamicPeriodicTrigger periodicTrigger(TriggerProperties triggerProperties) {
-		DynamicPeriodicTrigger trigger = new DynamicPeriodicTrigger(triggerProperties.getFixedDelay(),
-			triggerProperties.getTimeUnit());
+		DynamicPeriodicTrigger trigger = new DynamicPeriodicTrigger(triggerProperties.getPeriod());
 		trigger.setInitialDelay(triggerProperties.getInitialDelay());
 		return trigger;
 	}
 
 	@Bean
 	public LaunchRequestConsumer launchRequestConsumer(PollableMessageSource input,
-		DataFlowOperations dataFlowOperations, DynamicPeriodicTrigger trigger) {
+		DataFlowOperations dataFlowOperations, DynamicPeriodicTrigger trigger, TriggerProperties triggerProperties) {
 
 		if (dataFlowOperations.taskOperations() == null) {
 			throw new IllegalArgumentException("The SCDF server does not support task operations");
 		}
-		LaunchRequestConsumer consumer =
-			new LaunchRequestConsumer(input, trigger, dataFlowOperations.taskOperations());
+		LaunchRequestConsumer consumer = new LaunchRequestConsumer(input, trigger, triggerProperties.getMaxPeriod(),
+			dataFlowOperations.taskOperations());
 		consumer.setAutoStartup(autoStart);
 		return consumer;
 	}

@@ -33,12 +33,24 @@ import org.springframework.scheduling.concurrent.ConcurrentTaskScheduler;
 import org.springframework.util.Assert;
 
 /**
+ *
+ * A Message consumer that submits received task {@link LaunchRequest}s to a Data Flow server. This
+ * polls a {@link PollableMessageSource} only if the Data Flow server is not at its concurrent task execution limit.
+ *
+ * The consumer runs as a {@link ScheduledFuture} , configured with a {@link DynamicPeriodicTrigger} to
+ * support exponential backoff up to a maximum period. Every period cycle, the poller first makes a REST call to the
+ * Data Flow server to check if it can accept a new task LaunchRequest before checking the Message source. The
+ * polling period will back off (increase) when either the server is not accepting requests or no request is received.
+ *
+ *  The period will revert to its initial value whenever both a request is received and the DataFlow Server is
+ *  accepting launch requests. The period remain at the maximum value when there are no requests to avoid hammering
+ *  the Data Flow server for no reason.
+ *
  * @author David Turanski
  **/
 public class LaunchRequestConsumer implements SmartLifecycle {
 	private static final Log log = LogFactory.getLog(LaunchRequestConsumer.class);
 	private static final int BACKOFF_MULTIPLE = 2;
-	private static final int BACKOFF_MAX_SECONDS = 30;
 
 	private final PollableMessageSource input;
 	private final AtomicBoolean running = new AtomicBoolean();
@@ -47,17 +59,20 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 	private final DynamicPeriodicTrigger trigger;
 	private final ConcurrentTaskScheduler taskScheduler;
 	private final long initialPeriod;
+	private final long maxPeriod;
 	private volatile boolean autoStart = true;
 
 	private ScheduledFuture<?> scheduledFuture;
 
 	public LaunchRequestConsumer(PollableMessageSource input, DynamicPeriodicTrigger trigger,
+		long maxPeriod,
 		TaskOperations taskOperations) {
 		Assert.notNull(input, "`input` cannot be null.");
 		Assert.notNull(taskOperations, "`taskOperations` cannot be null.");
 		this.input = input;
 		this.trigger = trigger;
 		this.initialPeriod = trigger.getPeriod();
+		this.maxPeriod = maxPeriod;
 		this.taskOperations = taskOperations;
 		this.taskScheduler = new ConcurrentTaskScheduler();
 
@@ -145,7 +160,7 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 	}
 
 	private void backoff(String message) {
-		if (trigger.getPeriod() > 0 && trigger.getPeriod() < Duration.ofSeconds(BACKOFF_MAX_SECONDS).toMillis()) {
+		if (trigger.getPeriod() > 0 && trigger.getPeriod() < Duration.ofMillis(maxPeriod).toMillis()) {
 
 			Duration duration = Duration.ofMillis(trigger.getPeriod());
 			if (duration.compareTo(Duration.ofSeconds(8)) <= 0) {
@@ -156,7 +171,7 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 				duration = duration.multipliedBy(BACKOFF_MULTIPLE);
 			}
 			else {
-				duration = Duration.ofSeconds(BACKOFF_MAX_SECONDS);
+				duration = Duration.ofMillis(maxPeriod);
 			}
 			if (trigger.getPeriod() < 1000) {
 				log.info(String.format(message + " - increasing polling period to %d ms.", duration.toMillis()));
