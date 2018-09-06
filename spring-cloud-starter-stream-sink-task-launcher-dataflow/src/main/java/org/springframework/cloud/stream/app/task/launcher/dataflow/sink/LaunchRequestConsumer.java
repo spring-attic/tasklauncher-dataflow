@@ -23,28 +23,29 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import org.springframework.cloud.dataflow.rest.client.DataFlowClientException;
 import org.springframework.cloud.dataflow.rest.client.TaskOperations;
 import org.springframework.cloud.dataflow.rest.resource.CurrentTaskExecutionsResource;
 import org.springframework.cloud.stream.binder.PollableMessageSource;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.integration.util.DynamicPeriodicTrigger;
+import org.springframework.retry.support.RetryTemplate;
 import org.springframework.scheduling.concurrent.ConcurrentTaskScheduler;
 import org.springframework.util.Assert;
 
 /**
- *
  * A Message consumer that submits received task {@link LaunchRequest}s to a Data Flow server. This
  * polls a {@link PollableMessageSource} only if the Data Flow server is not at its concurrent task execution limit.
- *
+ * <p>
  * The consumer runs as a {@link ScheduledFuture} , configured with a {@link DynamicPeriodicTrigger} to
  * support exponential backoff up to a maximum period. Every period cycle, the poller first makes a REST call to the
  * Data Flow server to check if it can accept a new task LaunchRequest before checking the Message source. The
  * polling period will back off (increase) when either the server is not accepting requests or no request is received.
- *
- *  The period will revert to its initial value whenever both a request is received and the DataFlow Server is
- *  accepting launch requests. The period remain at the maximum value when there are no requests to avoid hammering
- *  the Data Flow server for no reason.
+ * <p>
+ * The period will revert to its initial value whenever both a request is received and the DataFlow Server is
+ * accepting launch requests. The period remain at the maximum value when there are no requests to avoid hammering
+ * the Data Flow server for no reason.
  *
  * @author David Turanski
  **/
@@ -60,13 +61,13 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 	private final ConcurrentTaskScheduler taskScheduler;
 	private final long initialPeriod;
 	private final long maxPeriod;
+	private final RetryTemplate retryTemplate;
 	private volatile boolean autoStart = true;
 
 	private ScheduledFuture<?> scheduledFuture;
 
-	public LaunchRequestConsumer(PollableMessageSource input, DynamicPeriodicTrigger trigger,
-		long maxPeriod,
-		TaskOperations taskOperations) {
+	public LaunchRequestConsumer(PollableMessageSource input, DynamicPeriodicTrigger trigger, long maxPeriod,
+		TaskOperations taskOperations, RetryTemplate retryTemplate) {
 		Assert.notNull(input, "`input` cannot be null.");
 		Assert.notNull(taskOperations, "`taskOperations` cannot be null.");
 		this.input = input;
@@ -74,8 +75,8 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 		this.initialPeriod = trigger.getPeriod();
 		this.maxPeriod = maxPeriod;
 		this.taskOperations = taskOperations;
+		this.retryTemplate = retryTemplate;
 		this.taskScheduler = new ConcurrentTaskScheduler();
-
 	}
 
 	/*
@@ -96,7 +97,7 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 				if (!input.poll(message -> {
 					LaunchRequest request = (LaunchRequest) message.getPayload();
 					log.debug("Received a Task launch request - task name:  " + request.getApplicationName());
-					launchTask(request);
+					retryLaunchTask(request);
 				}, new ParameterizedTypeReference<LaunchRequest>() {
 				})) {
 					backoff("No task launch request received");
@@ -167,8 +168,6 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 
 			Duration duration = Duration.ofMillis(trigger.getPeriod());
 
-
-
 			if (duration.multipliedBy(BACKOFF_MULTIPLE).compareTo(Duration.ofMillis(maxPeriod)) <= 0) {
 				//If d >= 1, round to 1 seconds.
 				if (duration.getSeconds() == 1) {
@@ -188,7 +187,7 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 
 			trigger.setPeriod(duration.toMillis());
 		}
-		else if (trigger.getPeriod() == Duration.ofMillis(maxPeriod).toMillis()){
+		else if (trigger.getPeriod() == Duration.ofMillis(maxPeriod).toMillis()) {
 			log.info(message);
 		}
 	}
@@ -200,14 +199,15 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 		try {
 			CurrentTaskExecutionsResource taskExecutionsResource = taskOperations.currentTaskExecutions();
 
-			availableForNewTasks = taskExecutionsResource.getRunningExecutionCount() < taskExecutionsResource.getMaximumTaskExecutions();
+			availableForNewTasks =
+				taskExecutionsResource.getRunningExecutionCount() < taskExecutionsResource.getMaximumTaskExecutions();
 			if (!availableForNewTasks) {
 				log.warn(String.format("Data Flow server has reached its concurrent task execution limit: (%d)",
 					taskExecutionsResource.getMaximumTaskExecutions()));
 			}
 		}
 		// If cannot connect to Data Flow server, log the exception and return false so the poller will back off.
-		catch( Exception e) {
+		catch (Exception e) {
 			log.error(e.getMessage(), e);
 		}
 		finally {
@@ -215,11 +215,36 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 		}
 	}
 
-	// Here we need to throw any exception to retry the message.
+	/*
+	 * Wrap launchTask() in a RetryTemplate.
+	 */
+	private void retryLaunchTask(LaunchRequest request) {
+		this.retryTemplate.execute(context -> launchTask(request));
+	}
+
+	/*
+	 * Ask the server to launch the task. This is only called when serverIsAcceptingNewTasks() returns true. However
+	 * things may have changed in the meantime. If the DataFlowClientException message indicates the task execution
+	 * limit has been reached, convert the exception to a TaskExecutionLimitException. The local RetryTemplate callback
+	 * will only retry on this type of exception.
+	 */
 	private long launchTask(LaunchRequest request) {
 		log.info(String.format("Launching Task %s", request.getApplicationName()));
-		return taskOperations.launch(request.getApplicationName(), request.getDeploymentProperties(),
-			request.getCommandlineArguments());
+		long taskId = 0;
+		try {
+			taskId = taskOperations.launch(request.getApplicationName(), request.getDeploymentProperties(),
+				request.getCommandlineArguments());
+			log.info(
+				String.format(String.format("Task %s launched - task id = %d", request.getApplicationName(), taskId)));
+		}
+		catch (DataFlowClientException e) {
+			log.error(e.getMessage().trim());
+			TaskExecutionLimitException.throwOnMessageMatch(e);
+			log.error("", e);
+			throw e;
+
+		}
+		return taskId;
 	}
 
 }
