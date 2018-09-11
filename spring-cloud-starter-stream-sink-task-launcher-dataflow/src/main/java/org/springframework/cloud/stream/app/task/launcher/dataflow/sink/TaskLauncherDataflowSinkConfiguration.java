@@ -16,13 +16,22 @@
 
 package org.springframework.cloud.stream.app.task.launcher.dataflow.sink;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.dataflow.rest.client.DataFlowOperations;
 import org.springframework.cloud.stream.annotation.EnableBinding;
 import org.springframework.cloud.stream.binder.PollableMessageSource;
 import org.springframework.context.annotation.Bean;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.integration.util.DynamicPeriodicTrigger;
+import org.springframework.retry.RetryContext;
+import org.springframework.retry.RetryPolicy;
+import org.springframework.retry.RetryState;
+import org.springframework.retry.annotation.EnableRetry;
+import org.springframework.retry.backoff.FixedBackOffPolicy;
+import org.springframework.retry.policy.SimpleRetryPolicy;
+import org.springframework.retry.support.RetryTemplate;
 
 /**
  * Configuration class for the TaskLauncher Data Flow Sink.
@@ -31,6 +40,7 @@ import org.springframework.integration.util.DynamicPeriodicTrigger;
  */
 @EnableBinding(PollingSink.class)
 @EnableConfigurationProperties({ TriggerProperties.class })
+@EnableRetry
 public class TaskLauncherDataflowSinkConfiguration {
 
 	@Value("${autostart:true}")
@@ -45,14 +55,44 @@ public class TaskLauncherDataflowSinkConfiguration {
 
 	@Bean
 	public LaunchRequestConsumer launchRequestConsumer(PollableMessageSource input,
-		DataFlowOperations dataFlowOperations, DynamicPeriodicTrigger trigger, TriggerProperties triggerProperties) {
+		DataFlowOperations dataFlowOperations, DynamicPeriodicTrigger trigger, TriggerProperties triggerProperties,
+		@Qualifier("taskExecutionLimitRetryTemplate") RetryTemplate retryTemplate) {
 
 		if (dataFlowOperations.taskOperations() == null) {
 			throw new IllegalArgumentException("The SCDF server does not support task operations");
 		}
 		LaunchRequestConsumer consumer = new LaunchRequestConsumer(input, trigger, triggerProperties.getMaxPeriod(),
-			dataFlowOperations.taskOperations());
+			dataFlowOperations.taskOperations(), retryTemplate);
 		consumer.setAutoStartup(autoStart);
 		return consumer;
+	}
+
+	@Bean
+	public RetryTemplate taskExecutionLimitRetryTemplate() {
+
+		RetryTemplate retryTemplate =  new LaunchRetryTemplate();
+
+		/*
+		 * Retry at 1 sec intervals up to 5 minutes.
+		 */
+		FixedBackOffPolicy backOffPolicy = new FixedBackOffPolicy();
+		backOffPolicy.setBackOffPeriod(1000);
+
+		SimpleRetryPolicy retryPolicy = new SimpleRetryPolicy();
+		retryPolicy.setMaxAttempts(300);
+
+		retryTemplate.setBackOffPolicy(backOffPolicy);
+		retryTemplate.setRetryPolicy(retryPolicy);
+		retryTemplate.setThrowLastExceptionOnExhausted(true);
+
+		return retryTemplate;
+	}
+
+	static class LaunchRetryTemplate extends RetryTemplate {
+		@Override
+		protected boolean shouldRethrow(RetryPolicy retryPolicy, RetryContext context,
+			RetryState state) {
+			return !(context.getLastThrowable() instanceof TaskExecutionLimitException);
+		}
 	}
 }

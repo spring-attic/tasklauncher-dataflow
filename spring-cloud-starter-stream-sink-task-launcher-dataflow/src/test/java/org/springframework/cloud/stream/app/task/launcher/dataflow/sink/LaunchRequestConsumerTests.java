@@ -48,7 +48,6 @@ import org.springframework.integration.util.DynamicPeriodicTrigger;
 import org.springframework.lang.Nullable;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.support.MessageBuilder;
-import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit4.SpringRunner;
 
@@ -65,7 +64,6 @@ import static org.mockito.Mockito.when;
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE, classes = LaunchRequestConsumerTests.TestConfig.class, properties = {
 	"logging.level.org.springframework.cloud.stream.app.task.launcher.dataflow.sink=DEBUG", "maxExecutions=10" })
-@DirtiesContext
 public abstract class LaunchRequestConsumerTests {
 	protected static Log log = LogFactory.getLog(LaunchRequestConsumerTests.class);
 
@@ -90,7 +88,6 @@ public abstract class LaunchRequestConsumerTests {
 		private DynamicPeriodicTrigger trigger;
 
 		@Test
-		@DirtiesContext
 		public void consumerPausesWhenMaxTaskExecutionsReached() throws InterruptedException {
 
 			currentTaskExecutionsResource.setRunningExecutionCount(0);
@@ -145,7 +142,6 @@ public abstract class LaunchRequestConsumerTests {
 		private LaunchRequestConsumer consumer;
 
 		@Test
-		@DirtiesContext
 		public void testExponentialBackOff() throws InterruptedException {
 
 			currentTaskExecutionsResource.setRunningExecutionCount(
