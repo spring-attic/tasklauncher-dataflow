@@ -95,7 +95,7 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 
 				if (!input.poll(message -> {
 					LaunchRequest request = (LaunchRequest) message.getPayload();
-					log.debug("Received a Task launch request - task name:  " + request.getApplicationName());
+					log.debug("Received a Task launch request - task name:  " + request.getTaskName());
 					launchTask(request);
 				}, new ParameterizedTypeReference<LaunchRequest>() {
 				})) {
@@ -217,8 +217,8 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 
 	// Here we need to throw any exception to retry the message.
 	private long launchTask(LaunchRequest request) {
-		log.info(String.format("Launching Task %s", request.getApplicationName()));
-		return taskOperations.launch(request.getApplicationName(), request.getDeploymentProperties(),
+		log.info(String.format("Launching Task %s", request.getTaskName()));
+		return taskOperations.launch(request.getTaskName(), request.getDeploymentProperties(),
 			request.getCommandlineArguments());
 	}
 

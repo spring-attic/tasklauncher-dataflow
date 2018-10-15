@@ -35,7 +35,7 @@ public class LaunchRequest {
 	@JsonProperty("deploymentProps")
 	private Map<String, String> deploymentProperties = new HashMap<>();
 	@JsonProperty("name")
-	private String applicationName;
+	private String taskName;
 
 	public List<String> getCommandlineArguments() {
 		return commandlineArguments;
@@ -55,12 +55,12 @@ public class LaunchRequest {
 		this.deploymentProperties = deploymentProperties;
 	}
 
-	public String getApplicationName() {
-		return applicationName;
+	public String getTaskName() {
+		return taskName;
 	}
 
-	public void setApplicationName(String applicationName) {
-		Assert.hasText(applicationName, "'applicationName' cannot be blank.");
-		this.applicationName = applicationName;
+	public void setTaskName(String taskName) {
+		Assert.hasText(taskName, "'taskName' cannot be blank.");
+		this.taskName = taskName;
 	}
 }

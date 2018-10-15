@@ -246,7 +246,7 @@ public abstract class LaunchRequestConsumerTests {
 						DefaultPollableMessageSource messageSource = (DefaultPollableMessageSource) bean;
 						messageSource.setSource(() -> {
 							LaunchRequest request = new LaunchRequest();
-							request.setApplicationName("foo");
+							request.setTaskName("foo");
 							request.setCommandlineArguments(Arrays.asList("bar"));
 
 							Message<Object> message = null;

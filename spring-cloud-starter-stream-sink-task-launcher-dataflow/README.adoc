@@ -5,7 +5,7 @@ This application launches a registered task application using the Data Flow Serv
 
 == Input
 
-Launch request parameters including:
+Launch request args including:
 
 * the task name (required and registered as a task with the target Data Flow Server)
 * deployment properties (key value pairs, optional).
