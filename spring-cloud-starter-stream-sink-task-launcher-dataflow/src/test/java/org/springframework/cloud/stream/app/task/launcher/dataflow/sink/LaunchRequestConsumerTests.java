@@ -16,6 +16,7 @@
 
 package org.springframework.cloud.stream.app.task.launcher.dataflow.sink;
 
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -105,7 +106,7 @@ public abstract class LaunchRequestConsumerTests {
 
 			assertThat(eventually(c -> c.isPaused() && c.isRunning())).isTrue();
 
-			assertThat(trigger.getPeriod()).isGreaterThanOrEqualTo(20);
+			assertThat(trigger.getDuration()).isGreaterThanOrEqualTo(Duration.ofMillis(20));
 
 			log.debug("Resetting execution count");
 			currentTaskExecutionsResource.setRunningExecutionCount(0);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 the original author or authors.
+ * Copyright 2018-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -71,7 +71,7 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 		Assert.notNull(taskOperations, "`taskOperations` cannot be null.");
 		this.input = input;
 		this.trigger = trigger;
-		this.initialPeriod = trigger.getPeriod();
+		this.initialPeriod = trigger.getDuration().toMillis();
 		this.maxPeriod = maxPeriod;
 		this.taskOperations = taskOperations;
 		this.taskScheduler = new ConcurrentTaskScheduler();
@@ -103,9 +103,9 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 				}
 				else {
 
-					if (trigger.getPeriod() > initialPeriod) {
-						trigger.setPeriod(initialPeriod);
-						log.info(String.format("Polling period reset to %d ms.", trigger.getPeriod()));
+					if (trigger.getDuration().toMillis() > initialPeriod) {
+						trigger.setDuration(Duration.ofMillis(initialPeriod));
+						log.info(String.format("Polling period reset to %d ms.", trigger.getDuration().toMillis()));
 					}
 				}
 			}
@@ -163,33 +163,35 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 	}
 
 	private void backoff(String message) {
-		if (trigger.getPeriod() > 0 && trigger.getPeriod() < Duration.ofMillis(maxPeriod).toMillis()) {
+		synchronized (trigger) {
+			if (trigger.getDuration().compareTo(Duration.ZERO) > 0
+				&& trigger.getDuration().compareTo(Duration.ofMillis(maxPeriod)) < 0) {
 
-			Duration duration = Duration.ofMillis(trigger.getPeriod());
+				Duration duration = trigger.getDuration();
 
-
-
-			if (duration.multipliedBy(BACKOFF_MULTIPLE).compareTo(Duration.ofMillis(maxPeriod)) <= 0) {
-				//If d >= 1, round to 1 seconds.
-				if (duration.getSeconds() == 1) {
-					duration = duration.ofSeconds(1);
+				if (duration.multipliedBy(BACKOFF_MULTIPLE).compareTo(Duration.ofMillis(maxPeriod)) <= 0) {
+					//If d >= 1, round to 1 seconds.
+					if (duration.getSeconds() == 1) {
+						duration = Duration.ofSeconds(1);
+					}
+					duration = duration.multipliedBy(BACKOFF_MULTIPLE);
 				}
-				duration = duration.multipliedBy(BACKOFF_MULTIPLE);
-			}
-			else {
-				duration = Duration.ofMillis(maxPeriod);
-			}
-			if (trigger.getPeriod() < 1000) {
-				log.info(String.format(message + " - increasing polling period to %d ms.", duration.toMillis()));
-			}
-			else {
-				log.info(String.format(message + "- increasing polling period to %d seconds.", duration.getSeconds()));
-			}
+				else {
+					duration = Duration.ofMillis(maxPeriod);
+				}
+				if (trigger.getDuration().toMillis() < 1000) {
+					log.info(String.format(message + " - increasing polling period to %d ms.", duration.toMillis()));
+				}
+				else {
+					log.info(
+						String.format(message + "- increasing polling period to %d seconds.", duration.getSeconds()));
+				}
 
-			trigger.setPeriod(duration.toMillis());
-		}
-		else if (trigger.getPeriod() == Duration.ofMillis(maxPeriod).toMillis()){
-			log.info(message);
+				trigger.setDuration(duration);
+			}
+			else if (trigger.getDuration() == Duration.ofMillis(maxPeriod)) {
+				log.info(message);
+			}
 		}
 	}
 
