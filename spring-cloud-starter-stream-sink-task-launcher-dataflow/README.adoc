@@ -1,7 +1,7 @@
 //tag::ref-doc[]
 = TaskLauncher Data Flow Sink
 
-This application launches a registered task application using the Data Flow Server http://docs.spring.io/spring-cloud-dataflow/docs/current/reference/htmlsingle/#api-guide-resources-task-executions-launching[REST API].
+This application launches a registered task application using the Data Flow Server https://docs.spring.io/spring-cloud-dataflow/docs/current/reference/htmlsingle/#api-guide-resources-task-executions-launching[REST API].
 
 == Input
 
@@ -61,7 +61,7 @@ for launch requests but will pause when the SCDF server's concurrent task execut
 .dataflow.task
 .maximum-concurrent-tasks`
 is reached (see the
-http://docs.spring.io/spring-cloud-dataflow/docs/current/reference/htmlsingle/#spring-cloud-dataflow-task-limit-concurrent-executions[reference docs] for more details).
+https://docs.spring.io/spring-cloud-dataflow/docs/current/reference/htmlsingle/#spring-cloud-dataflow-task-limit-concurrent-executions[reference docs] for more details).
 
 When the number of running tasks drops below this limit message polling resumes. This is intended to prevent
 the SCDF deployer's deployment platform from running out of resources under heavy task load. The poller is
