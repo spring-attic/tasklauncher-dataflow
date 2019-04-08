@@ -16,6 +16,8 @@
 
 package org.springframework.cloud.stream.app.task.launcher.dataflow.sink;
 
+import java.time.Duration;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.dataflow.rest.client.DataFlowOperations;
@@ -30,7 +32,7 @@ import org.springframework.integration.util.DynamicPeriodicTrigger;
  * @author David Turanski
  */
 @EnableBinding(PollingSink.class)
-@EnableConfigurationProperties({ TriggerProperties.class })
+@EnableConfigurationProperties({ TriggerProperties.class, DataflowTaskLauncherSinkProperties.class })
 public class TaskLauncherDataflowSinkConfiguration {
 
 	@Value("${autostart:true}")
@@ -39,13 +41,14 @@ public class TaskLauncherDataflowSinkConfiguration {
 	@Bean
 	public DynamicPeriodicTrigger periodicTrigger(TriggerProperties triggerProperties) {
 		DynamicPeriodicTrigger trigger = new DynamicPeriodicTrigger(triggerProperties.getPeriod());
-		trigger.setInitialDelay(triggerProperties.getInitialDelay());
+		trigger.setInitialDuration(Duration.ofMillis(triggerProperties.getInitialDelay()));
 		return trigger;
 	}
 
 	@Bean
 	public LaunchRequestConsumer launchRequestConsumer(PollableMessageSource input,
-		DataFlowOperations dataFlowOperations, DynamicPeriodicTrigger trigger, TriggerProperties triggerProperties) {
+		DataFlowOperations dataFlowOperations, DynamicPeriodicTrigger trigger, TriggerProperties triggerProperties,
+		DataflowTaskLauncherSinkProperties sinkProperties) {
 
 		if (dataFlowOperations.taskOperations() == null) {
 			throw new IllegalArgumentException("The SCDF server does not support task operations");
@@ -53,6 +56,7 @@ public class TaskLauncherDataflowSinkConfiguration {
 		LaunchRequestConsumer consumer = new LaunchRequestConsumer(input, trigger, triggerProperties.getMaxPeriod(),
 			dataFlowOperations.taskOperations());
 		consumer.setAutoStartup(autoStart);
+		consumer.setPlatformName(sinkProperties.getPlatformName());
 		return consumer;
 	}
 }

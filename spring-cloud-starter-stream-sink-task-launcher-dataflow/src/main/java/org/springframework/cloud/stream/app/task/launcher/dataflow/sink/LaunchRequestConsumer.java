@@ -17,20 +17,28 @@
 package org.springframework.cloud.stream.app.task.launcher.dataflow.sink;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import javax.annotation.PostConstruct;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import org.springframework.cloud.dataflow.rest.client.TaskOperations;
 import org.springframework.cloud.dataflow.rest.resource.CurrentTaskExecutionsResource;
+import org.springframework.cloud.dataflow.rest.resource.LauncherResource;
 import org.springframework.cloud.stream.binder.PollableMessageSource;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.hateoas.PagedResources;
 import org.springframework.integration.util.DynamicPeriodicTrigger;
 import org.springframework.scheduling.concurrent.ConcurrentTaskScheduler;
 import org.springframework.util.Assert;
+import org.springframework.util.StringUtils;
 
 /**
  *
@@ -51,6 +59,7 @@ import org.springframework.util.Assert;
 public class LaunchRequestConsumer implements SmartLifecycle {
 	private static final Log log = LogFactory.getLog(LaunchRequestConsumer.class);
 	private static final int BACKOFF_MULTIPLE = 2;
+	static final String TASK_PLATFORM_NAME = "spring.cloud.dataflow.task.platformName";
 
 	private final PollableMessageSource input;
 	private final AtomicBoolean running = new AtomicBoolean();
@@ -64,9 +73,10 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 
 	private ScheduledFuture<?> scheduledFuture;
 
+	private String platformName = "default";
+
 	public LaunchRequestConsumer(PollableMessageSource input, DynamicPeriodicTrigger trigger,
-		long maxPeriod,
-		TaskOperations taskOperations) {
+		long maxPeriod, TaskOperations taskOperations) {
 		Assert.notNull(input, "`input` cannot be null.");
 		Assert.notNull(taskOperations, "`taskOperations` cannot be null.");
 		this.input = input;
@@ -75,7 +85,6 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 		this.maxPeriod = maxPeriod;
 		this.taskOperations = taskOperations;
 		this.taskScheduler = new ConcurrentTaskScheduler();
-
 	}
 
 	/*
@@ -88,7 +97,7 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 				return;
 			}
 
-			if (serverIsAcceptingNewTasks()) {
+			if (platformIsAcceptingNewTasks()) {
 				if (paused.compareAndSet(true, false)) {
 					log.info("Polling resumed");
 				}
@@ -102,7 +111,6 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 					backoff("No task launch request received");
 				}
 				else {
-
 					if (trigger.getDuration().toMillis() > initialPeriod) {
 						trigger.setDuration(Duration.ofMillis(initialPeriod));
 						log.info(String.format("Polling period reset to %d ms.", trigger.getDuration().toMillis()));
@@ -162,8 +170,8 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 		return Integer.MAX_VALUE;
 	}
 
-	private void backoff(String message) {
-		synchronized (trigger) {
+		private void backoff(String message) {
+			synchronized (trigger) {
 			if (trigger.getDuration().compareTo(Duration.ZERO) > 0
 				&& trigger.getDuration().compareTo(Duration.ofMillis(maxPeriod)) < 0) {
 
@@ -195,17 +203,33 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 		}
 	}
 
-	private boolean serverIsAcceptingNewTasks() {
+	private boolean platformIsAcceptingNewTasks() {
 
 		boolean availableForNewTasks = false;
+		int maximumTaskExecutions = 0;
+		int runningExecutionCount = 0;
 
+		List<String> currentPlatforms = new ArrayList<>();
 		try {
-			CurrentTaskExecutionsResource taskExecutionsResource = taskOperations.currentTaskExecutions();
+			boolean validPlatform = false;
+			for (CurrentTaskExecutionsResource currentTaskExecutionsResource: taskOperations.currentTaskExecutions()){
+				if (currentTaskExecutionsResource.getName().equals(platformName)){
+					maximumTaskExecutions = currentTaskExecutionsResource.getMaximumTaskExecutions();
+					runningExecutionCount = currentTaskExecutionsResource.getRunningExecutionCount();
+					validPlatform = true;
+				}
+				currentPlatforms.add(currentTaskExecutionsResource.getName());
+			}
 
-			availableForNewTasks = taskExecutionsResource.getRunningExecutionCount() < taskExecutionsResource.getMaximumTaskExecutions();
+			// Verify for each request as configuration may have changed on server.
+			assertValidPlatform(validPlatform, currentPlatforms);
+
+			availableForNewTasks = runningExecutionCount < maximumTaskExecutions;
 			if (!availableForNewTasks) {
-				log.warn(String.format("Data Flow server has reached its concurrent task execution limit: (%d)",
-					taskExecutionsResource.getMaximumTaskExecutions()));
+				log.warn(String.format(
+					"The data Flow task platform %s has reached its concurrent task execution limit: (%d)",
+					platformName,
+					maximumTaskExecutions));
 			}
 		}
 		// If cannot connect to Data Flow server, log the exception and return false so the poller will back off.
@@ -219,9 +243,60 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 
 	// Here we need to throw any exception to retry the message.
 	private long launchTask(LaunchRequest request) {
-		log.info(String.format("Launching Task %s", request.getTaskName()));
-		return taskOperations.launch(request.getTaskName(), request.getDeploymentProperties(),
+		String requestPlatformName = request.getDeploymentProperties().get(TASK_PLATFORM_NAME);
+		if (StringUtils.hasText(requestPlatformName) && !platformName.equals(requestPlatformName)) {
+			throw new IllegalStateException(
+				String.format("Task Launch request for Task %s contains deployment property '%s=%s' which does not " +
+					"match the platform configured for the Task Launcher: '%s'",
+					request.getTaskName(),
+					TASK_PLATFORM_NAME,
+					request.getDeploymentProperties().get(TASK_PLATFORM_NAME),
+					platformName));
+		}
+		log.info(String.format("Launching Task %s on platform %s", request.getTaskName(), platformName));
+		return taskOperations.launch(request.getTaskName(),
+			enrichDeploymentProperties(request.getDeploymentProperties()),
 			request.getCommandlineArguments());
+	}
+
+	private Map<String, String> enrichDeploymentProperties(Map<String, String> deploymentProperties) {
+		if (!deploymentProperties.containsKey(TASK_PLATFORM_NAME)) {
+			Map<String, String> enrichedProperties = new HashMap<>();
+			enrichedProperties.putAll(deploymentProperties);
+			enrichedProperties.put(TASK_PLATFORM_NAME, platformName);
+			return enrichedProperties;
+		}
+		return deploymentProperties;
+	}
+
+	public void setPlatformName(String platformName) {
+		this.platformName = platformName;
+	}
+
+	@PostConstruct
+	public void verifyTaskPlatform() {
+		PagedResources<LauncherResource> launchers = taskOperations.listPlatforms();
+
+		boolean validPlatform = false;
+		List<String> currentPlatforms = new ArrayList<>();
+
+		for (LauncherResource launcherResource : launchers) {
+			currentPlatforms.add(launcherResource.getName());
+			if (launcherResource.getName().equals(platformName)) {
+				validPlatform = true;
+			}
+		}
+
+		assertValidPlatform(validPlatform, currentPlatforms);
+	}
+
+	private void assertValidPlatform(boolean validPlatform, List<String> currentPlatforms) {
+		Assert.notEmpty(currentPlatforms, "The Data Flow Server has no task platforms configured");
+
+		Assert.isTrue(validPlatform, String.format(
+			"The task launcher's platform name '%s' does not match one of the Data Flow server's configured task "
+				+ "platforms: [%s].",
+			platformName, StringUtils.collectionToCommaDelimitedString(currentPlatforms)));
 	}
 
 }

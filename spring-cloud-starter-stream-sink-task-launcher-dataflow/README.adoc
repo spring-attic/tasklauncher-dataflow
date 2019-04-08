@@ -37,13 +37,14 @@ minimally,
 
 == Output
 
-N/A (launches task to the local system).
+N/A (launches task on the SCDF server's task platform).
 
 === Options
 
 The **$$tasklauncher-dataflow$$** $$sink$$ supports the following configuration properties:
 
 //tag::configuration-properties[]
+$$platform-name$$:: $$The Spring Cloud Data Flow platform to use for launching tasks.$$ *($$String$$, default: `$$default$$`)*
 $$spring.cloud.dataflow.client.authentication.basic.password$$:: $$The login password.$$ *($$String$$, default: `$$<none>$$`)*
 $$spring.cloud.dataflow.client.authentication.basic.username$$:: $$The login username.$$ *($$String$$, default: `$$<none>$$`)*
 $$spring.cloud.dataflow.client.enable-dsl$$:: $$Enable Data Flow DSL access.$$ *($$Boolean$$, default: `$$false$$`)*
@@ -55,20 +56,23 @@ $$trigger.period$$:: $$The polling period in milliseconds.$$ *($$Integer$$, defa
 //end::configuration-properties[]
 
 == Using the TaskLauncher
-A tasklauncher is a sink that consumes  `LaunchRequest` messages, as described above, and launches a task using the
-configured Spring Cloud Data Flow server (given by `--dataflow.uri`). The task launcher periodically polls its input
-for launch requests but will pause when the SCDF server's concurrent task execution limit given by `spring.cloud
-.dataflow.task
-.maximum-concurrent-tasks`
-is reached (see the
-https://docs.spring.io/spring-cloud-dataflow/docs/current/reference/htmlsingle/#spring-cloud-dataflow-task-limit-concurrent-executions[reference docs] for more details).
+Th Dataflow tasklauncher is a sink that consumes  `LaunchRequest` messages, as described above, and launches a task using the configured Spring Cloud Data Flow server (given by `--dataflow.uri`).
+The task launcher periodically polls its input for launch requests but will pause when the platform has reached it's concurrent task execution limit, given by `spring.cloud.dataflow.task.platform.<platform-type>.accounts[<account-name>].maximum-concurrent-tasks`.
+This prevents the SCDF deployer's deployment platform from exhausting its resources under heavy task load.
+The poller is scheduled using a `DynamicPeriodicTrigger`. By default the polling rate is 1 second, but may be configured to any duration. When paused, or if there are no launch requests, the trigger period will increase, applying exponential backoff, up to a configured maximum (30 seconds by default).
 
-When the number of running tasks drops below this limit message polling resumes. This is intended to prevent
-the SCDF deployer's deployment platform from running out of resources under heavy task load. The poller is
-scheduled using a `DynamicPeriodicTrigger`. By default the polling rate is 1 second, but may be
-configured to any duration. When paused, or if there are no launch requests, the trigger period will increase, applying
-exponential backoff, up to a configured maximum (30 seconds by default).
+NOTE: This version of the Dataflow tasklauncher requires SCDF version 2.0.2 or higher.
 
+The SCDF 2.x server may be configured to launch tasks on multiple platforms.
+Each task launcher instance is configured for a single platform, given by the `platformName` property (`default` if not specified).
+This limitation is enforced because if the server has multiple task platforms configured, it may be the case that some of its task platforms are at the limit and some are not.
+In this situation, we could only consume the next launch request if we know for which task platform it is targeted.
+For this reason, if the SCDF server is configured for multiple task platforms (or a single non-default platform), we assume that all launch requests are targeted for that platform.
+The tasklauncher will set the required deployment property `spring.cloud.dataflow.task.platformName` if the request does not provide it.
+
+NOTE: If the request includes the deployment property `spring.cloud.dataflow.task.platformName`, and the value is not the same as the tasklauncher's `platformName`, the request will not be submitted and an exception will be thrown.
+
+To launch tasks on multiple platforms, you must configure a task launcher instance per platform and use a https://github.com/spring-cloud-stream-app-starters/router/tree/master/spring-cloud-starter-stream-sink-router[router sink], or https://docs.spring.io/spring-cloud-stream/docs/current/reference/htmlsingle/#partitioning[partitioning strategy], to route requests to the correct instance.
 
 NOTE: When the poller is paused it puts pressure
  on the message broker so some tuning will be necessary in extreme cases to balance resource utilization.

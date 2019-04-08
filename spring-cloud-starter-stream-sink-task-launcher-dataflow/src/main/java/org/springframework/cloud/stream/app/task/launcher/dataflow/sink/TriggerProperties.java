@@ -17,7 +17,6 @@
 package org.springframework.cloud.stream.app.task.launcher.dataflow.sink;
 
 import javax.annotation.PostConstruct;
-import javax.persistence.criteria.CriteriaBuilder;
 import javax.validation.constraints.Min;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
