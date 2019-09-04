@@ -16,10 +16,11 @@
     </parent>
 
     <properties>
-        <spring.cloud.task.version>2.0.1.RELEASE</spring.cloud.task.version>
-		<spring.cloud.dataflow.version>2.0.2.RELEASE</spring.cloud.dataflow.version>
+        <spring.cloud.task.version>2.2.0.M2</spring.cloud.task.version>
+		<spring.cloud.dataflow.version>2.3.0.BUILD-SNAPSHOT</spring.cloud.dataflow.version>
 		<!-- todo: Fixes a startup error caused by binder does not set Bean Factory in pollable message source -->
 		<spring.integration.version>5.1.4.RELEASE</spring.integration.version>
+		<spring.hateoas.version>1.0.0.RC1</spring.hateoas.version>
 	</properties>
 
     <dependencyManagement>
@@ -43,6 +44,11 @@
   				<groupId>org.springframework.cloud</groupId>
  				<artifactId>spring-cloud-dataflow-rest-client</artifactId>
   				<version>${spring.cloud.dataflow.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.springframework.hateoas</groupId>
+				<artifactId>spring-hateoas</artifactId>
+				<version>${spring.hateoas.version}</version>
 			</dependency>
 			<dependency>
 				<groupId>org.junit.jupiter</groupId>

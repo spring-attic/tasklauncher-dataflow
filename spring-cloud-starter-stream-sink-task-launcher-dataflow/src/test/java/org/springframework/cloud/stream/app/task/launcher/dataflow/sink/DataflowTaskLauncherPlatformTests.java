@@ -28,7 +28,7 @@ import org.springframework.cloud.dataflow.rest.client.TaskOperations;
 import org.springframework.cloud.dataflow.rest.resource.LauncherResource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Profile;
-import org.springframework.hateoas.PagedResources;
+import org.springframework.hateoas.PagedModel;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -37,6 +37,7 @@ import static org.mockito.Mockito.when;
 
 /**
  * @author David Turanski
+ * @author Gunnar Hillert
  **/
 public class DataflowTaskLauncherPlatformTests {
 
@@ -92,7 +93,7 @@ public class DataflowTaskLauncherPlatformTests {
 			LauncherResource launcherResource = mock(LauncherResource.class);
 			when(launcherResource.getName()).thenReturn("default");
 
-			when(taskOperations.listPlatforms()).thenReturn(new PagedResources<>(
+			when(taskOperations.listPlatforms()).thenReturn(new PagedModel<>(
 				Collections.singletonList(launcherResource), null));
 			return taskOperations;
 		}
@@ -101,7 +102,7 @@ public class DataflowTaskLauncherPlatformTests {
 		@Profile("nolaunchers")
 		TaskOperations taskOperationsNoLaunchers() {
 			TaskOperations taskOperations = mock(TaskOperations.class);
-			when(taskOperations.listPlatforms()).thenReturn(new PagedResources<>(
+			when(taskOperations.listPlatforms()).thenReturn(new PagedModel<>(
 				Collections.emptyList(), null));
 			return taskOperations;
 		}

@@ -29,6 +29,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
 
 import org.springframework.beans.BeansException;
@@ -43,7 +44,7 @@ import org.springframework.cloud.stream.binder.PollableMessageSource;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.env.Environment;
-import org.springframework.hateoas.PagedResources;
+import org.springframework.hateoas.PagedModel;
 import org.springframework.integration.channel.DirectChannel;
 import org.springframework.integration.util.DynamicPeriodicTrigger;
 import org.springframework.lang.Nullable;
@@ -57,11 +58,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
  * @author David Turanski
+ * @author Gunnar Hillert
  **/
 public class LaunchRequestConsumerTests {
 
@@ -87,7 +90,7 @@ public class LaunchRequestConsumerTests {
 
 				consumer.start();
 
-				assertThat(countDownLatch.await(1, TimeUnit.SECONDS)).isTrue();
+				assertThat(countDownLatch.await(10, TimeUnit.SECONDS)).isTrue();
 				assertThat(currentTaskExecutionsResource.getRunningExecutionCount()).isEqualTo(
 					currentTaskExecutionsResource.getMaximumTaskExecutions());
 				assertThat(eventually(c -> c.isPaused() && c.isRunning(), consumer)).isTrue();
@@ -246,7 +249,7 @@ public class LaunchRequestConsumerTests {
 			CountDownLatch latch) {
 
 			taskOperations = mock(TaskOperations.class);
-			when(taskOperations.launch(anyString(), anyMap(), anyList())).thenAnswer((Answer<Long>) invocation -> {
+			when(taskOperations.launch(anyString(), anyMap(), anyList(), isNull())).thenAnswer((Answer<Long>) invocation -> {
 				currentTaskExecutionsResource.setRunningExecutionCount(
 					currentTaskExecutionsResource.getRunningExecutionCount() + 1);
 				latch.countDown();
@@ -267,7 +270,7 @@ public class LaunchRequestConsumerTests {
 			launcherResources.add(launcherResource0);
 			launcherResources.add(launcherResource1);
 
-			when(taskOperations.listPlatforms()).thenReturn(new PagedResources(launcherResources, null));
+			when(taskOperations.listPlatforms()).thenReturn(new PagedModel(launcherResources, null));
 
 			dataFlowOperations = mock(DataFlowOperations.class);
 			when(dataFlowOperations.taskOperations()).thenReturn(taskOperations);

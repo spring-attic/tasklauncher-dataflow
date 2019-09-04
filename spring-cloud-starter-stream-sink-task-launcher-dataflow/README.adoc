@@ -45,6 +45,7 @@ The **$$tasklauncher-dataflow$$** $$sink$$ supports the following configuration 
 
 //tag::configuration-properties[]
 $$platform-name$$:: $$The Spring Cloud Data Flow platform to use for launching tasks.$$ *($$String$$, default: `$$default$$`)*
+$$spring.cloud.dataflow.client.authentication.access-token$$:: $$<documentation missing>$$ *($$String$$, default: `$$<none>$$`)*
 $$spring.cloud.dataflow.client.authentication.basic.password$$:: $$The login password.$$ *($$String$$, default: `$$<none>$$`)*
 $$spring.cloud.dataflow.client.authentication.basic.username$$:: $$The login username.$$ *($$String$$, default: `$$<none>$$`)*
 $$spring.cloud.dataflow.client.enable-dsl$$:: $$Enable Data Flow DSL access.$$ *($$Boolean$$, default: `$$false$$`)*

@@ -34,7 +34,7 @@ import org.springframework.cloud.dataflow.rest.resource.LauncherResource;
 import org.springframework.cloud.stream.binder.PollableMessageSource;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.hateoas.PagedResources;
+import org.springframework.hateoas.PagedModel;
 import org.springframework.integration.util.DynamicPeriodicTrigger;
 import org.springframework.scheduling.concurrent.ConcurrentTaskScheduler;
 import org.springframework.util.Assert;
@@ -256,7 +256,7 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 		log.info(String.format("Launching Task %s on platform %s", request.getTaskName(), platformName));
 		return taskOperations.launch(request.getTaskName(),
 			enrichDeploymentProperties(request.getDeploymentProperties()),
-			request.getCommandlineArguments());
+			request.getCommandlineArguments(), null);
 	}
 
 	private Map<String, String> enrichDeploymentProperties(Map<String, String> deploymentProperties) {
@@ -275,7 +275,7 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 
 	@PostConstruct
 	public void verifyTaskPlatform() {
-		PagedResources<LauncherResource> launchers = taskOperations.listPlatforms();
+		PagedModel<LauncherResource> launchers = taskOperations.listPlatforms();
 
 		boolean validPlatform = false;
 		List<String> currentPlatforms = new ArrayList<>();
