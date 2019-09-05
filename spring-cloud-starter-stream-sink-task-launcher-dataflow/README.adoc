@@ -44,6 +44,11 @@ N/A (launches task on the SCDF server's task platform).
 The **$$tasklauncher-dataflow$$** $$sink$$ supports the following configuration properties:
 
 //tag::configuration-properties[]
+$$dataflow-server-access-token$$:: $$OAuth2 Access Token.$$ *($$String$$, default: `$$<none>$$`)*
+$$oauth2-client-credentials-client-id$$:: $$The OAuth2 Client Id (Used for the client credentials grant).$$ *($$String$$, default: `$$<none>$$`)*
+$$oauth2-client-credentials-client-secret$$:: $$The OAuth2 Client Secret (Used for the client credentials grant).$$ *($$String$$, default: `$$<none>$$`)*
+$$oauth2-client-credentials-scopes$$:: $$OAuth2 Authorization scopes (Used for the client credentials grant).$$ *($$Set<String>$$, default: `$$<none>$$`)*
+$$oauth2-client-credentials-token-uri$$:: $$Token URI for the OAuth2 provider (Used for the client credentials grant).$$ *($$String$$, default: `$$<none>$$`)*
 $$platform-name$$:: $$The Spring Cloud Data Flow platform to use for launching tasks.$$ *($$String$$, default: `$$default$$`)*
 $$spring.cloud.dataflow.client.authentication.basic.password$$:: $$The login password.$$ *($$String$$, default: `$$<none>$$`)*
 $$spring.cloud.dataflow.client.authentication.basic.username$$:: $$The login username.$$ *($$String$$, default: `$$<none>$$`)*

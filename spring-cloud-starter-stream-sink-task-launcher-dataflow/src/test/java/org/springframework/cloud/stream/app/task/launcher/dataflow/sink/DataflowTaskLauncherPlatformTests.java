@@ -25,6 +25,7 @@ import org.springframework.beans.factory.BeanCreationException;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.cloud.dataflow.rest.client.DataFlowOperations;
 import org.springframework.cloud.dataflow.rest.client.TaskOperations;
+import org.springframework.cloud.dataflow.rest.client.config.DataFlowClientProperties;
 import org.springframework.cloud.dataflow.rest.resource.LauncherResource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Profile;
@@ -112,5 +113,11 @@ public class DataflowTaskLauncherPlatformTests {
 			when(dataFlowOperations.taskOperations()).thenReturn(taskOperations);
 			return dataFlowOperations;
 		}
+
+		@Bean
+		DataFlowClientProperties dataFlowClientProperties() {
+			return new DataFlowClientProperties();
+		}
+
 	}
 }

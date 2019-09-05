@@ -36,6 +36,7 @@ import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.cloud.dataflow.rest.client.DataFlowOperations;
 import org.springframework.cloud.dataflow.rest.client.TaskOperations;
+import org.springframework.cloud.dataflow.rest.client.config.DataFlowClientProperties;
 import org.springframework.cloud.dataflow.rest.resource.CurrentTaskExecutionsResource;
 import org.springframework.cloud.dataflow.rest.resource.LauncherResource;
 import org.springframework.cloud.stream.binder.DefaultPollableMessageSource;
@@ -239,6 +240,11 @@ public class LaunchRequestConsumerTests {
 		@Bean
 		public MessageChannel errorChannel() {
 			return new DirectChannel();
+		}
+
+		@Bean
+		DataFlowClientProperties dataFlowClientProperties() {
+			return new DataFlowClientProperties();
 		}
 
 		@Bean
