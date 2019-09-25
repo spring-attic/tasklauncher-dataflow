@@ -18,80 +18,79 @@ package org.springframework.cloud.stream.app.task.launcher.dataflow.sink;
 import java.util.Set;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.cloud.dataflow.core.DataFlowPropertyKeys;
 
 /**
  * Configuration properties used in {@link DataFlowClientAutoConfiguration}
  *
  * @author Gunnar Hillert
  */
-@ConfigurationProperties(prefix = DataFlowPropertyKeys.PREFIX + "client.authentication")
+@ConfigurationProperties
 public class CustomDataFlowClientProperties {
 
-		/**
-		 * OAuth2 Access Token.
-		 */
-		private String dataflowServerAccessToken;
+	/**
+	 * OAuth2 Access Token.
+	 */
+	private String dataflowServerAccessToken;
 
-		/**
-		 * The OAuth2 Client Id (Used for the client credentials grant).
-		 *
-		 */
-		private String oauth2ClientCredentialsClientId;
+	/**
+	 * The OAuth2 Client Id (Used for the client credentials grant).
+	 *
+	 */
+	private String oauth2ClientCredentialsClientId;
 
-		/**
-		 * The OAuth2 Client Secret (Used for the client credentials grant).
-		 */
-		private String oauth2ClientCredentialsClientSecret;
+	/**
+	 * The OAuth2 Client Secret (Used for the client credentials grant).
+	 */
+	private String oauth2ClientCredentialsClientSecret;
 
-		/**
-		 * Token URI for the OAuth2 provider (Used for the client credentials grant).
-		 */
-		private String oauth2ClientCredentialsTokenUri;
+	/**
+	 * Token URI for the OAuth2 provider (Used for the client credentials grant).
+	 */
+	private String oauth2ClientCredentialsTokenUri;
 
-		/**
-		 * OAuth2 Authorization scopes (Used for the client credentials grant).
-		 */
-		private Set<String> oauth2ClientCredentialsScopes;
+	/**
+	 * OAuth2 Authorization scopes (Used for the client credentials grant).
+	 */
+	private Set<String> oauth2ClientCredentialsScopes;
 
-		public String getDataflowServerAccessToken() {
-			return dataflowServerAccessToken;
-		}
+	public String getDataflowServerAccessToken() {
+		return dataflowServerAccessToken;
+	}
 
-		public void setDataflowServerAccessToken(String dataflowServerAccessToken) {
-			this.dataflowServerAccessToken = dataflowServerAccessToken;
-		}
+	public void setDataflowServerAccessToken(String dataflowServerAccessToken) {
+		this.dataflowServerAccessToken = dataflowServerAccessToken;
+	}
 
-		public String getOauth2ClientCredentialsClientId() {
-			return oauth2ClientCredentialsClientId;
-		}
+	public String getOauth2ClientCredentialsClientId() {
+		return oauth2ClientCredentialsClientId;
+	}
 
-		public void setOauth2ClientCredentialsClientId(String oauth2ClientCredentialsClientId) {
-			this.oauth2ClientCredentialsClientId = oauth2ClientCredentialsClientId;
-		}
+	public void setOauth2ClientCredentialsClientId(String oauth2ClientCredentialsClientId) {
+		this.oauth2ClientCredentialsClientId = oauth2ClientCredentialsClientId;
+	}
 
-		public String getOauth2ClientCredentialsClientSecret() {
-			return oauth2ClientCredentialsClientSecret;
-		}
+	public String getOauth2ClientCredentialsClientSecret() {
+		return oauth2ClientCredentialsClientSecret;
+	}
 
-		public void setOauth2ClientCredentialsClientSecret(String oauth2ClientCredentialsClientSecret) {
-			this.oauth2ClientCredentialsClientSecret = oauth2ClientCredentialsClientSecret;
-		}
+	public void setOauth2ClientCredentialsClientSecret(String oauth2ClientCredentialsClientSecret) {
+		this.oauth2ClientCredentialsClientSecret = oauth2ClientCredentialsClientSecret;
+	}
 
-		public String getOauth2ClientCredentialsTokenUri() {
-			return oauth2ClientCredentialsTokenUri;
-		}
+	public String getOauth2ClientCredentialsTokenUri() {
+		return oauth2ClientCredentialsTokenUri;
+	}
 
-		public void setOauth2ClientCredentialsTokenUri(String oauth2ClientCredentialsTokenUri) {
-			this.oauth2ClientCredentialsTokenUri = oauth2ClientCredentialsTokenUri;
-		}
+	public void setOauth2ClientCredentialsTokenUri(String oauth2ClientCredentialsTokenUri) {
+		this.oauth2ClientCredentialsTokenUri = oauth2ClientCredentialsTokenUri;
+	}
 
-		public Set<String> getOauth2ClientCredentialsScopes() {
-			return oauth2ClientCredentialsScopes;
-		}
+	public Set<String> getOauth2ClientCredentialsScopes() {
+		return oauth2ClientCredentialsScopes;
+	}
 
-		public void setOauth2ClientCredentialsScopes(Set<String> oauth2ClientCredentialsScopes) {
-			this.oauth2ClientCredentialsScopes = oauth2ClientCredentialsScopes;
-		}
+	public void setOauth2ClientCredentialsScopes(Set<String> oauth2ClientCredentialsScopes) {
+		this.oauth2ClientCredentialsScopes = oauth2ClientCredentialsScopes;
+	}
 
 }
