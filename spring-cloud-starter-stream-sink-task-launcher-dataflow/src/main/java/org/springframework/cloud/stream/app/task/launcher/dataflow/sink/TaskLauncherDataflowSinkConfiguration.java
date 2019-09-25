@@ -17,6 +17,7 @@
 package org.springframework.cloud.stream.app.task.launcher.dataflow.sink;
 
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.Duration;
 
 import org.apache.commons.logging.Log;
@@ -31,9 +32,20 @@ import org.springframework.cloud.dataflow.rest.client.config.DataFlowClientAutoC
 import org.springframework.cloud.dataflow.rest.client.config.DataFlowClientProperties;
 import org.springframework.cloud.dataflow.rest.util.HttpClientConfigurer;
 import org.springframework.cloud.stream.annotation.EnableBinding;
+import org.springframework.cloud.stream.app.task.launcher.dataflow.sink.support.OnOAuth2ClientCredentialsEnabled;
 import org.springframework.cloud.stream.binder.PollableMessageSource;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Conditional;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.integration.util.DynamicPeriodicTrigger;
+import org.springframework.security.oauth2.client.endpoint.DefaultClientCredentialsTokenResponseClient;
+import org.springframework.security.oauth2.client.endpoint.OAuth2AccessTokenResponseClient;
+import org.springframework.security.oauth2.client.endpoint.OAuth2ClientCredentialsGrantRequest;
+import org.springframework.security.oauth2.client.registration.ClientRegistration;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.client.registration.InMemoryClientRegistrationRepository;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.oauth2.core.endpoint.OAuth2AccessTokenResponse;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
 
@@ -86,25 +98,70 @@ public class TaskLauncherDataflowSinkConfiguration {
 	/**
 	 * Once the task-launcher-dataflow sink has been updated for Boot 2.2.x, this bean can be removed
 	 * as Data Flow 2.3.x provides this functionality via the {@link DataFlowClientAutoConfiguration}.
+	 * @throws URISyntaxException
 	 */
 	@Bean
-	public DataFlowOperations dataFlowOperations() throws Exception{
-		RestTemplate template = DataFlowTemplate.prepareRestTemplate(restTemplate);
+	public DataFlowOperations dataFlowOperations(
+			@Autowired(required = false) ClientRegistrationRepository  clientRegistrations,
+			@Autowired(required = false) OAuth2AccessTokenResponseClient<OAuth2ClientCredentialsGrantRequest> clientCredentialsTokenResponseClient) throws URISyntaxException {
+
+		final RestTemplate template = DataFlowTemplate.prepareRestTemplate(restTemplate);
+
 		final HttpClientConfigurer httpClientConfigurer = HttpClientConfigurer.create(new URI(properties.getServerUri()))
 				.skipTlsCertificateVerification(properties.isSkipSslValidation());
 
-		if (StringUtils.hasText(this.customProperties.getAccessToken())) {
-			template.getInterceptors().add(new OAuth2AccessTokenProvidingClientHttpRequestInterceptor(this.customProperties.getAccessToken()));
+		String accessTokenValue = null;
+
+		if (this.customProperties.getOauth2ClientCredentialsClientId() != null) {
+			final ClientRegistration clientRegistration = clientRegistrations.findByRegistrationId("default");
+			final OAuth2ClientCredentialsGrantRequest grantRequest = new OAuth2ClientCredentialsGrantRequest(clientRegistration);
+			final OAuth2AccessTokenResponse res = clientCredentialsTokenResponseClient.getTokenResponse(grantRequest);
+			accessTokenValue = res.getAccessToken().getTokenValue();
+			logger.debug("Configured OAuth2 Client Credentials for accessing the Data Flow Server");
+		}
+		else if (StringUtils.hasText(this.customProperties.getDataflowServerAccessToken())) {
+			accessTokenValue = this.customProperties.getDataflowServerAccessToken();
 			logger.debug("Configured OAuth2 Access Token for accessing the Data Flow Server");
 		}
-		else if(!StringUtils.isEmpty(properties.getAuthentication().getBasic().getUsername()) &&
-				!StringUtils.isEmpty(properties.getAuthentication().getBasic().getPassword())){
+		else if (StringUtils.hasText(properties.getAuthentication().getBasic().getUsername())
+				&& StringUtils.hasText(properties.getAuthentication().getBasic().getPassword())) {
+			accessTokenValue = null;
 			httpClientConfigurer.basicAuthCredentials(properties.getAuthentication().getBasic().getUsername(), properties.getAuthentication().getBasic().getPassword());
-			template.setRequestFactory(httpClientConfigurer.buildClientHttpRequestFactory());
+			logger.debug("Configured basic security for accessing the Data Flow Server");
 		}
 		else {
-			logger.debug("Not configuring security for accessing the Data Flow Server");
+			logger.debug("Not configuring basic security for accessing the Data Flow Server");
 		}
+
+		if (accessTokenValue != null) {
+			template.getInterceptors().add(new OAuth2AccessTokenProvidingClientHttpRequestInterceptor(accessTokenValue));
+		}
+
+		template.setRequestFactory(httpClientConfigurer.buildClientHttpRequestFactory());
+
 		return new DataFlowTemplate(new URI(properties.getServerUri()), template);
+	}
+
+	@Configuration
+	@Conditional(OnOAuth2ClientCredentialsEnabled.class)
+	static class clientCredentialsConfiguration {
+		@Bean
+		public InMemoryClientRegistrationRepository clientRegistrationRepository(
+				CustomDataFlowClientProperties properties) {
+			final ClientRegistration clientRegistration = ClientRegistration
+					.withRegistrationId("default")
+					.authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+					.tokenUri(properties.getOauth2ClientCredentialsTokenUri())
+					.clientId(properties.getOauth2ClientCredentialsClientId())
+					.clientSecret(properties.getOauth2ClientCredentialsClientSecret())
+					.scope(properties.getOauth2ClientCredentialsScopes())
+					.build();
+			return new InMemoryClientRegistrationRepository(clientRegistration);
+		}
+
+		@Bean
+		OAuth2AccessTokenResponseClient<OAuth2ClientCredentialsGrantRequest> clientCredentialsTokenResponseClient() {
+			return new DefaultClientCredentialsTokenResponseClient();
+		}
 	}
 }
