@@ -46,6 +46,7 @@ import org.springframework.security.oauth2.client.registration.ClientRegistratio
 import org.springframework.security.oauth2.client.registration.InMemoryClientRegistrationRepository;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AccessTokenResponse;
+import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
 
@@ -98,6 +99,10 @@ public class TaskLauncherDataflowSinkConfiguration {
 	/**
 	 * Once the task-launcher-dataflow sink has been updated for Boot 2.2.x, this bean can be removed
 	 * as Data Flow 2.3.x provides this functionality via the {@link DataFlowClientAutoConfiguration}.
+	 *
+	 * @param clientRegistrations Must not be null if OAuth is enabled
+	 * @param clientCredentialsTokenResponseClient Must not be null if OAuth is enabled
+	 *
 	 * @throws URISyntaxException
 	 */
 	@Bean
@@ -113,6 +118,10 @@ public class TaskLauncherDataflowSinkConfiguration {
 		String accessTokenValue = null;
 
 		if (this.customProperties.getOauth2ClientCredentialsClientId() != null) {
+			final String assertionMessage = "%s clientRegistrations must not be null if OAuth2 Client Credentials are being used.";
+			Assert.notNull(clientRegistrations, String.format(assertionMessage, clientRegistrations));
+			Assert.notNull(clientCredentialsTokenResponseClient, String.format(assertionMessage, clientCredentialsTokenResponseClient));
+
 			final ClientRegistration clientRegistration = clientRegistrations.findByRegistrationId("default");
 			final OAuth2ClientCredentialsGrantRequest grantRequest = new OAuth2ClientCredentialsGrantRequest(clientRegistration);
 			final OAuth2AccessTokenResponse res = clientCredentialsTokenResponseClient.getTokenResponse(grantRequest);
@@ -125,7 +134,6 @@ public class TaskLauncherDataflowSinkConfiguration {
 		}
 		else if (StringUtils.hasText(properties.getAuthentication().getBasic().getUsername())
 				&& StringUtils.hasText(properties.getAuthentication().getBasic().getPassword())) {
-			accessTokenValue = null;
 			httpClientConfigurer.basicAuthCredentials(properties.getAuthentication().getBasic().getUsername(), properties.getAuthentication().getBasic().getPassword());
 			logger.debug("Configured basic security for accessing the Data Flow Server");
 		}
