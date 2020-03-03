@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 the original author or authors.
+ * Copyright 2019-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +16,15 @@
 
 package org.springframework.cloud.stream.app.task.launcher.dataflow.sink;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import java.util.Collections;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
 import org.springframework.beans.factory.BeanCreationException;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.cloud.dataflow.rest.client.DataFlowOperations;
@@ -29,12 +33,7 @@ import org.springframework.cloud.dataflow.rest.client.config.DataFlowClientPrope
 import org.springframework.cloud.dataflow.rest.resource.LauncherResource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Profile;
-import org.springframework.hateoas.PagedResources;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import org.springframework.hateoas.PagedModel;
 
 /**
  * @author David Turanski
@@ -93,7 +92,7 @@ public class DataflowTaskLauncherPlatformTests {
 			LauncherResource launcherResource = mock(LauncherResource.class);
 			when(launcherResource.getName()).thenReturn("default");
 
-			when(taskOperations.listPlatforms()).thenReturn(new PagedResources<>(
+			when(taskOperations.listPlatforms()).thenReturn(new PagedModel<>(
 				Collections.singletonList(launcherResource), null));
 			return taskOperations;
 		}
@@ -102,7 +101,7 @@ public class DataflowTaskLauncherPlatformTests {
 		@Profile("nolaunchers")
 		TaskOperations taskOperationsNoLaunchers() {
 			TaskOperations taskOperations = mock(TaskOperations.class);
-			when(taskOperations.listPlatforms()).thenReturn(new PagedResources<>(
+			when(taskOperations.listPlatforms()).thenReturn(new PagedModel<>(
 				Collections.emptyList(), null));
 			return taskOperations;
 		}

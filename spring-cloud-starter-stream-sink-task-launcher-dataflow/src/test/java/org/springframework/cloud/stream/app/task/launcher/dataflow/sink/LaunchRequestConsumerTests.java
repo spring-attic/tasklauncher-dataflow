@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 the original author or authors.
+ * Copyright 2019-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,14 @@
 
 package org.springframework.cloud.stream.app.task.launcher.dataflow.sink;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,12 +33,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.stubbing.Answer;
-
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -44,7 +49,7 @@ import org.springframework.cloud.stream.binder.PollableMessageSource;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.env.Environment;
-import org.springframework.hateoas.PagedResources;
+import org.springframework.hateoas.PagedModel;
 import org.springframework.integration.channel.DirectChannel;
 import org.springframework.integration.util.DynamicPeriodicTrigger;
 import org.springframework.lang.Nullable;
@@ -54,12 +59,8 @@ import org.springframework.messaging.SubscribableChannel;
 import org.springframework.messaging.support.ErrorMessage;
 import org.springframework.messaging.support.MessageBuilder;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyMap;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * @author David Turanski
@@ -252,7 +253,8 @@ public class LaunchRequestConsumerTests {
 			CountDownLatch latch) {
 
 			taskOperations = mock(TaskOperations.class);
-			when(taskOperations.launch(anyString(), anyMap(), anyList())).thenAnswer((Answer<Long>) invocation -> {
+			when(taskOperations.launch(anyString(), anyMap(), anyList(), isNull())).thenAnswer((Answer<Long>) invocation -> {
+				System.out.println("launching task...");
 				currentTaskExecutionsResource.setRunningExecutionCount(
 					currentTaskExecutionsResource.getRunningExecutionCount() + 1);
 				latch.countDown();
@@ -273,7 +275,7 @@ public class LaunchRequestConsumerTests {
 			launcherResources.add(launcherResource0);
 			launcherResources.add(launcherResource1);
 
-			when(taskOperations.listPlatforms()).thenReturn(new PagedResources(launcherResources, null));
+			when(taskOperations.listPlatforms()).thenReturn(new PagedModel<>(launcherResources, null));
 
 			dataFlowOperations = mock(DataFlowOperations.class);
 			when(dataFlowOperations.taskOperations()).thenReturn(taskOperations);
