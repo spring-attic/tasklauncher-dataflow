@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 the original author or authors.
+ * Copyright 2018-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,16 +25,16 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.annotation.PostConstruct;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.springframework.cloud.dataflow.rest.client.TaskOperations;
 import org.springframework.cloud.dataflow.rest.resource.CurrentTaskExecutionsResource;
 import org.springframework.cloud.dataflow.rest.resource.LauncherResource;
 import org.springframework.cloud.stream.binder.PollableMessageSource;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.hateoas.PagedResources;
+import org.springframework.hateoas.PagedModel;
 import org.springframework.integration.util.DynamicPeriodicTrigger;
 import org.springframework.scheduling.concurrent.ConcurrentTaskScheduler;
 import org.springframework.util.Assert;
@@ -256,7 +256,7 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 		log.info(String.format("Launching Task %s on platform %s", request.getTaskName(), platformName));
 		return taskOperations.launch(request.getTaskName(),
 			enrichDeploymentProperties(request.getDeploymentProperties()),
-			request.getCommandlineArguments());
+			request.getCommandlineArguments(), null);
 	}
 
 	private Map<String, String> enrichDeploymentProperties(Map<String, String> deploymentProperties) {
@@ -275,7 +275,7 @@ public class LaunchRequestConsumer implements SmartLifecycle {
 
 	@PostConstruct
 	public void verifyTaskPlatform() {
-		PagedResources<LauncherResource> launchers = taskOperations.listPlatforms();
+		PagedModel<LauncherResource> launchers = taskOperations.listPlatforms();
 
 		boolean validPlatform = false;
 		List<String> currentPlatforms = new ArrayList<>();

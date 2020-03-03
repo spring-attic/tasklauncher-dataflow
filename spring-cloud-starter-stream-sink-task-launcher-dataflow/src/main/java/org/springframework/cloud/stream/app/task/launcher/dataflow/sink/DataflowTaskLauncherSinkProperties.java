@@ -16,9 +16,6 @@
 
 package org.springframework.cloud.stream.app.task.launcher.dataflow.sink;
 
-import javax.annotation.PostConstruct;
-import javax.validation.constraints.Min;
-
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -26,9 +23,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  **/
 @ConfigurationProperties
 public class DataflowTaskLauncherSinkProperties {
-
-	private TriggerProperties trigger = new TriggerProperties();
-
 	/**
 	 * The Spring Cloud Data Flow platform to use for launching tasks.
 	 */
@@ -40,55 +34,5 @@ public class DataflowTaskLauncherSinkProperties {
 
 	public void setPlatformName(String platformName) {
 		this.platformName = platformName;
-	}
-
-	public static class TriggerProperties {
-
-		/**
-		 * The initial delay in milliseconds.
-		 */
-		private long initialDelay = 1000;
-
-		/**
-		 * The polling period in milliseconds.
-		 */
-		private long period = 1000;
-
-		/**
-		 * The maximum polling period in milliseconds. Will be set to period if period > maxPeriod.
-		 */
-		private long maxPeriod = 30000;
-
-		@Min(0)
-		public long getInitialDelay() {
-			return initialDelay;
-		}
-
-		public void setInitialDelay(int initialDelay) {
-			this.initialDelay = initialDelay;
-		}
-
-		@Min(0)
-		public long getPeriod() {
-			return period;
-		}
-
-		public void setPeriod(int period) {
-			this.period = period;
-		}
-
-		@Min(1000)
-		public long getMaxPeriod() {
-			return maxPeriod;
-		}
-
-		public void setMaxPeriod(int maxPeriod) {
-			this.maxPeriod = maxPeriod;
-		}
-
-		@PostConstruct
-		public void checkMaxPeriod() {
-			maxPeriod = Long.max(maxPeriod, period);
-		}
 	}
 }
