@@ -12,6 +12,11 @@
 
 	<artifactId>spring-cloud-starter-stream-sink-task-launcher-dataflow</artifactId>
 
+	<properties>
+		<maven.compiler.source>1.8</maven.compiler.source>
+		<maven.compiler.target>1.8</maven.compiler.target>
+	</properties>
+
 	<dependencies>
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
@@ -30,23 +35,24 @@
 
 	<build>
 		<plugins>
-			<plugin>
-				<groupId>org.springframework.cloud</groupId>
-				<artifactId>spring-cloud-app-starter-doc-maven-plugin</artifactId>
-			</plugin>
-			<plugin>
-				<groupId>org.springframework.cloud.stream.app.plugin</groupId>
-				<artifactId>spring-cloud-stream-app-maven-plugin</artifactId>
-				<executions>
-					<execution>
-						<id>generate-documentation</id>
-						<phase>verify</phase>
-						<goals>
-							<goal>generate-documentation</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
+<!--			<plugin>-->
+<!--				<groupId>org.springframework.cloud</groupId>-->
+<!--				<artifactId>spring-cloud-app-starter-doc-maven-plugin</artifactId>-->
+<!--			</plugin>-->
+<!--			<plugin>-->
+<!--				<groupId>org.springframework.cloud.stream.app.plugin</groupId>-->
+<!--				<artifactId>spring-cloud-stream-app-maven-plugin</artifactId>-->
+<!--				<version>2.0.1.RELEASE</version>-->
+<!--				<executions>-->
+<!--					<execution>-->
+<!--						<id>generate-documentation</id>-->
+<!--						<phase>verify</phase>-->
+<!--						<goals>-->
+<!--							<goal>generate-documentation</goal>-->
+<!--						</goals>-->
+<!--					</execution>-->
+<!--				</executions>-->
+<!--			</plugin>-->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
