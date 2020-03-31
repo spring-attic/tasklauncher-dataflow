@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.springframework.cloud.stream.app</groupId>
 	<artifactId>tasklauncher-dataflow-app-starters-build</artifactId>
-	<version>1.1.0.RELEASE</version>
+	<version>1.1.1.BUILD-SNAPSHOT</version>
 	<packaging>pom</packaging>
 
 	<parent>
@@ -15,7 +15,7 @@
 
 	<properties>
 		<java.version>1.8</java.version>
-		<stream-apps-core.version>2.1.3.RELEASE</stream-apps-core.version>
+		<stream-apps-core.version>2.1.4.BUILD-SNAPSHOT</stream-apps-core.version>
 		<spring-boot.version>2.2.4.RELEASE</spring-boot.version>
 		<app-metadata-maven-plugin-version>1.0.2</app-metadata-maven-plugin-version>
 		<stream-apps-docs-plugin.version>2.0.1.RELEASE</stream-apps-docs-plugin.version>
@@ -39,7 +39,7 @@
 			<dependency>
 				<groupId>org.springframework.cloud.stream.app</groupId>
 				<artifactId>tasklauncher-dataflow-app-dependencies</artifactId>
-				<version>1.1.0.RELEASE</version>
+				<version>1.1.1.BUILD-SNAPSHOT</version>
 				<type>pom</type>
 				<scope>import</scope>
 			</dependency>
