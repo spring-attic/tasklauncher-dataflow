@@ -162,7 +162,7 @@
 				<configuration>
 					<images>
 						<image>
-							<name>springcloudstream/${project.artifactId}:${project.version}</name>
+							<name>springcloudstream/${project.artifactId}:1.1.0.RELEASE</name>
 							<build>
 								<from>springcloud/openjdk</from>
 								<volumes>
