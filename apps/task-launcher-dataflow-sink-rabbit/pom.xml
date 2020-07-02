@@ -172,7 +172,7 @@
 									<exec>
 										<arg>java</arg>
 										<arg>-jar</arg>
-										<arg>/maven/task-launcher-dataflow-sink-kafka.jar</arg>
+										<arg>/maven/task-launcher-dataflow-sink-rabbit.jar</arg>
 									</exec>
 								</entryPoint>
 								<assembly>
