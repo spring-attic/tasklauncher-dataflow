@@ -11,7 +11,7 @@
 	</parent>
 	<groupId>org.springframework.cloud.stream.app</groupId>
 	<artifactId>task-launcher-dataflow-sink-rabbit</artifactId>
-	<version>1.1.2.BUILD-SNAPSHOT</version>
+	<version>1.1.2.RELEASE</version>
 	<name>task-launcher-dataflow-sink-rabbit</name>
 	<description>Spring Cloud Stream Task Launcher Dataflow Sink Rabbit Binder Application</description>
 	<distributionManagement>
@@ -39,7 +39,7 @@
 			<dependency>
 				<groupId>org.springframework.cloud.stream.app</groupId>
 				<artifactId>tasklauncher-dataflow-app-dependencies</artifactId>
-				<version>1.1.2.BUILD-SNAPSHOT</version>
+				<version>1.1.2.RELEASE</version>
 				<type>pom</type>
 				<scope>import</scope>
 			</dependency>
@@ -184,7 +184,7 @@
 									<exec>
 										<arg>java</arg>
 										<arg>-jar</arg>
-										<arg>/maven/task-launcher-dataflow-sink-kafka.jar</arg>
+										<arg>/maven/task-launcher-dataflow-sink-rabbit.jar</arg>
 									</exec>
 								</entryPoint>
 								<assembly>
